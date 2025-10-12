@@ -60,13 +60,8 @@ class Form extends Controller
         unset($user_fields['token'], $user_fields['_token'], $user_fields['recaptcha'], $user_fields['g-recaptcha-response']);
 
         if (!empty($form['mail_to'])) {
-            Mail::to($form['mail_to'])->send(new MailForm(
-                $form_data,
-                $form['subject'],
-                $form['view'],
-                $form['type'],
-                $form['text_view'] ?? null
-            ));
+            $mail_form = new MailForm($form_data, $form['subject'], $form['view'], $form['type'], $form['text_view'] ?? null);
+            Mail::to($form['mail_to'])->send($mail_form);
         }
 
         // Fire webhook if configured
@@ -74,8 +69,35 @@ class Form extends Controller
             $this->notifyWebhook($form_name, (string)$submission_id, $user_fields, (string)$form['webhook_url']);
         }
 
-        $redirect = $form['success_page'] ? redirect($form['success_page']) : back();
-        return $redirect->with('success', true);
+        $successPage = $form['success_page'] ?? null;
+        if (empty($successPage)) {
+            return back()->with('success', true);
+        }
+
+        $target = $this->resolveSuccessTarget($request, (string) $successPage);
+        return redirect($target)->with('success', true);
+    }
+
+    private function resolveSuccessTarget(Request $request, string $success): string
+    {
+        // Absolute HTTP(S) URL
+        if (preg_match('~^https?://~i', $success) === 1) {
+            return $success;
+        }
+
+        // Absolute path within site
+        if (str_starts_with($success, '/')) {
+            return $success;
+        }
+
+        // Relative/fragment: append to originating page path
+        $previous = url()->previous();
+        $path = parse_url($previous, PHP_URL_PATH) ?: '/';
+        if ($path === '') {
+            $path = '/';
+        }
+
+        return $path . $success; // e.g., '/about' + '#footer'
     }
 
     private function validateInput(Request $request, array $rules): array
