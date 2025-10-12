@@ -53,5 +53,30 @@ return [
             // Optional webhook endpoint to receive form submissions
             'webhook_url' => env('CONTACT_FORM_WEBHOOK_URL'),
         ],
+
+        'signup' => [
+
+            'subject' => env('APP_NAME', 'Laravel') . ' Newsletter Signup',
+
+            'rules' => [
+                'email' => 'required|email|max:100',
+            ],
+
+            // If unset will return to current page
+            'success_page' => env('SIGNUP_FORM_SUCCESS_PAGE'),
+
+            // Email address to send signup notifications
+            'mail_to' => env('SIGNUP_FORM_MAIL_TO'),
+
+            // Email templates (have access to $formData)
+            'view' => 'emails.signup',
+            'text_view' => 'emails.signup_text',
+
+            // Values: view | text
+            'type' => 'view',
+
+            // Optional webhook
+            'webhook_url' => env('SIGNUP_FORM_WEBHOOK_URL'),
+        ],
     ],
 ];
