@@ -74,7 +74,7 @@ class Form extends Controller
             return back()->with('success', true);
         }
 
-        [$target, $fragment] = $this->resolveSuccessTarget($request, (string) $successPage);
+        [$target, $fragment] = $this->resolveSuccessTarget((string) $successPage);
         $resp = redirect($target);
         if (!empty($fragment)) {
             $resp = $resp->withFragment($fragment);
@@ -82,7 +82,7 @@ class Form extends Controller
         return $resp->with('success', true);
     }
 
-    private function resolveSuccessTarget(Request $request, string $success): array
+    private function resolveSuccessTarget(string $success): array
     {
         // Absolute HTTP(S) URL (preserve any embedded fragment)
         if (preg_match('~^https?://~i', $success) === 1) {
@@ -142,7 +142,7 @@ class Form extends Controller
         return null;
     }
 
-    private function looksAutomated(array $data, Agent $agent, string $form_name, string $ip_address): ?RedirectResponse
+    private function looksAutomated(array $data, Agent $agent, string $form_name, string $ip_address): ?string
     {
         // 1) User-Agent heuristic
         if (($agent->deviceType() ?? '') === 'Robot') {
