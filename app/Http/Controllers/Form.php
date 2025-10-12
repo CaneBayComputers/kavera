@@ -74,30 +74,43 @@ class Form extends Controller
             return back()->with('success', true);
         }
 
-        $target = $this->resolveSuccessTarget($request, (string) $successPage);
-        return redirect($target)->with('success', true);
+        [$target, $fragment] = $this->resolveSuccessTarget($request, (string) $successPage);
+        $resp = redirect($target);
+        if (!empty($fragment)) {
+            $resp = $resp->withFragment($fragment);
+        }
+        return $resp->with('success', true);
     }
 
-    private function resolveSuccessTarget(Request $request, string $success): string
+    private function resolveSuccessTarget(Request $request, string $success): array
     {
-        // Absolute HTTP(S) URL
+        // Absolute HTTP(S) URL (preserve any embedded fragment)
         if (preg_match('~^https?://~i', $success) === 1) {
-            return $success;
+            $url = $success;
+            $frag = parse_url($success, PHP_URL_FRAGMENT) ?: '';
+            if ($frag !== '') {
+                $url = str_replace('#' . $frag, '', $success);
+            }
+            return [$url, $frag ?: null];
         }
 
-        // Absolute path within site
+        // Absolute path within site, may include fragment
         if (str_starts_with($success, '/')) {
-            return $success;
+            $parts = explode('#', $success, 2);
+            $url = $parts[0];
+            $frag = $parts[1] ?? null;
+            return [$url, $frag];
         }
 
-        // Relative/fragment: append to originating page path
+        // Fragment or relative: append to originating page path
         $previous = url()->previous();
         $path = parse_url($previous, PHP_URL_PATH) ?: '/';
         if ($path === '') {
             $path = '/';
         }
 
-        return $path . $success; // e.g., '/about' + '#footer'
+        $frag = ltrim($success, '#');
+        return [$path, $frag !== '' ? $frag : null];
     }
 
     private function validateInput(Request $request, array $rules): array
