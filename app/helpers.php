@@ -1,28 +1,99 @@
 <?php
 
-use Symfony\Component\Yaml\Yaml;
-
-function array_to_text(array $input)
+function email_table(array $input, array $opts = []): string
 {
-    $pretty_json = json_encode($input, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    $lines = preg_split("/\r\n|\n|\r/", $pretty_json);
+    $defaults = [
+        'table_width'   => '100%',
+        'border_color'  => '#e5e7eb',
+        'header_bg'     => '#f9fafb',
+        'font_family'   => 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+        'label_width'   => '28%',
+        'value_width'   => '72%',
+    ];
 
-    $cleaned_lines = [];
+    $opts = array_merge($defaults, $opts);
 
-    foreach ($lines as $line) {
-        // Remove only the FIRST 4 spaces if present
-        $line = preg_replace('/^ {4}/', '', $line, 1);
+    $escape = static function ($value) {
+        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    };
 
-        // Remove braces, brackets, double quotes, and trailing commas
-        $line = str_replace(['{', '}', '[', ']', '"'], '', $line);
-        $line = preg_replace('/,\s*$/', '', $line);
+    $normalizeKey = static function ($key) {
+        $key = trim((string) $key);
+        $key = str_replace(['_', '-'], ' ', $key);
+        $key = preg_replace('/\s+/', ' ', $key);
+        return ucwords($key);
+    };
 
-        if ($line !== '') {
-            $cleaned_lines[] = $line;
+    $formatValue = static function ($value) use ($escape, $normalizeKey): string {
+        if (is_bool($value)) {
+            return $value ? 'TRUE' : 'FALSE';
         }
+        if ($value === null) {
+            return '—';
+        }
+        if (is_scalar($value)) {
+            return $escape((string) $value);
+        }
+
+        if (is_object($value)) {
+            if (method_exists($value, 'toArray')) {
+                $value = $value->toArray();
+            } else {
+                $value = json_decode(json_encode($value), true);
+            }
+        }
+
+        // Arrays/objects: render one level deep as Label: value lines
+        if (is_array($value)) {
+            $isAssoc = array_keys($value) !== range(0, count($value) - 1);
+
+            if (! $isAssoc) {
+                $joined = array_map(static function ($v) use ($escape) {
+                    return is_scalar($v) || $v === null ? $escape((string) $v) : $escape(json_encode($v));
+                }, $value);
+
+                return implode(', ', $joined);
+            }
+
+            $lines = [];
+            foreach ($value as $k => $v) {
+                if (is_bool($v)) {
+                    $v = $v ? 'TRUE' : 'FALSE';
+                } elseif ($v === null) {
+                    $v = '—';
+                } elseif (! is_scalar($v)) {
+                    $v = json_encode($v, JSON_UNESCAPED_SLASHES);
+                }
+
+                $lines[] = '<strong>' . $escape($normalizeKey($k)) . ':</strong> ' . $escape((string) $v);
+            }
+
+            return implode('<br>', $lines);
+        }
+
+        // Fallback
+        $json = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $json = $json === false ? '' : $json;
+        return '<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">' . $escape($json) . '</pre>';
+    };
+
+    $rows = '';
+
+    foreach ($input as $key => $value) {
+        $label = $normalizeKey($key);
+        $display = $formatValue($value);
+
+        $rows .= '<tr>' .
+            '<th style="text-align:left;vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';background:' . $opts['header_bg'] . ';width:' . $opts['label_width'] . ';">' . $escape($label) . '</th>' .
+            '<td style="vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';width:' . $opts['value_width'] . ';">' . $display . '</td>' .
+            '</tr>';
     }
 
-    return implode("\n", $cleaned_lines);
+    $table = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:' . $opts['table_width'] . ';font-family:' . $opts['font_family'] . ';font-size:14px;line-height:1.5;color:#111827;">'
+        . '<tbody>' . $rows . '</tbody>'
+        . '</table>';
+
+    return $table;
 }
 
 function is_dev()

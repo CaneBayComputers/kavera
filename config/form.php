@@ -2,19 +2,24 @@
 
 return [
 
+    // Throttling
     'ip_attempt_timeframe_seconds' => 15,
 
     'ip_max_attempts_per_timeframe' => 3,
 
+    // Google ReCaptcha settings
     'recaptcha' => [
 
+        // Required for production
         'site_key' => env('RECAPTCHA_SITE_KEY'),
 
+        // Required for production
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
 
         'url' => 'https://www.google.com/recaptcha/api/siteverify',
 
-        'threshold' => 0.7,
+        // Tested, seems to be good default
+        'threshold' => env('RECAPTCHA_THRESHOLD', 0.7),
     ],
 
     'forms' => [
@@ -31,13 +36,22 @@ return [
                 'company' => 'required_without:name|string|min:2|max:100',
             ],
 
-            'success_page' => '',
+            // If unset will return to form page
+            'success_page' => env('CONTACT_FORM_SUCCESS_PAGE'),
 
+            // Email address to send form data
             'mail_to' => env('CONTACT_FORM_MAIL_TO'),
 
+            // Has access to $formData array
             'view' => 'emails.contact',
+            // Optional plain-text view (used to build multipart/alternative emails)
+            'text_view' => 'emails.contact_text',
 
-            'type' => 'text'
+            // Values: view | text
+            'type' => 'view',
+
+            // Optional webhook endpoint to receive form submissions
+            'webhook_url' => env('CONTACT_FORM_WEBHOOK_URL'),
         ],
     ],
 ];

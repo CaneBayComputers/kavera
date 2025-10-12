@@ -15,16 +15,13 @@ This project uses a **flat-file CMS system** built directly on Laravel 12, with 
 
 ### 🚀 Installation Steps
 
-> **Note**: This project is designed to be used with the [cbc-development](https://github.com/CaneBayComputers/cbc-development) environment.
+You can run the project anywhere PHP 8.3 and Redis are available, but it pairs especially well with the [Podium CLI](https://github.com/CaneBayComputers/podium-cli). Once Podium is installed, spin everything up with:
 
-1. **Clone This Project Using cbc-development**
+```bash
+podium clone https://github.com/CaneBayComputers/laravel-flat-file-website.git
+```
 
-   ```bash
-   cd ~/cbc-development/scripts
-   ./clone_project.sh https://github.com/CaneBayComputers/cbc-laravel-website
-   ```
-
-That’s it! The environment setup, Docker services, and Redis configuration are handled automatically by `cbc-development`.
+Podium isn’t required, yet it provisions Docker, Redis, Mailhog, and project scaffolding automatically, so everything is ready to use as soon as the repo is cloned.
 
 ---
 
@@ -34,6 +31,12 @@ That’s it! The environment setup, Docker services, and Redis configuration are
 * Resolves to: `resources/views/content/contact.blade.php`
 * Validated by: Redis pre-built list
 * Served securely: Only existing pages are accessible, all others 404
+
+---
+
+### ✉️ Web Form Mailing
+
+The contact page ships with a ready-to-send email flow, relaying enquiries through whatever mail host you configure. Point the `.env` mail settings (mailer, host, port, credentials, from address) at your provider—Mailhog for local testing, Amazon SES, or any SMTP service works fine—then set the destination inbox via `CONTACT_FORM_MAIL_TO` to start receiving messages.
 
 ---
 
@@ -53,6 +56,19 @@ That’s it! The environment setup, Docker services, and Redis configuration are
   ```bash
   php artisan app:update-content-list
   ```
-* Use `art-docker` to run any Laravel Artisan commands inside the Docker container.
+* If you have Podium CLI installed use `podium art app:update-content-list` to run any Laravel Artisan commands inside the Docker container.
+
+---
+
+### 🤖 Agent‑Ready Workflow (Podium + Flat‑File)
+
+This repo is designed to be “agent‑friendly.” Given a content brief and a folder of images, an AI agent can scaffold a full site using Podium‑managed containers and this flat‑file architecture:
+
+- Drop images into `public/images` and optionally describe sections in `resources/content/<page>.yaml`.
+- The agent parses filenames and/or the YAML manifest to assemble pages under `resources/views/content/` (hero, cards, galleries, etc.).
+- Forms and email are already wired (see `config/form.php`), so new forms can reuse the same flow.
+- Run inside the container with Podium (`podium art`, `podium composer`, `podium php`) for a turn‑key experience.
+
+This enables one‑shot site generation: clone via Podium, place content, and render pages—no database required.
 
 ---

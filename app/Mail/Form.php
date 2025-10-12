@@ -15,15 +15,17 @@ class Form extends Mailable
     use SerializesModels;
 
     private $type;
+    public $textView = null;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(public array $formData, string $subject, string $view, string $type)
+    public function __construct(public array $formData, string $subject, string $view, string $type, ?string $textView = null)
     {
         $this->subject = $subject;
         $this->view = $view;
         $this->type = $type;
+        $this->textView = $textView;
     }
 
     /**
@@ -41,13 +43,15 @@ class Form extends Mailable
      */
     public function content(): Content
     {
-        if ($this->type == 'text') {
-            $content = new Content(text: $this->view);
-        } else {
-            $content = new Content(view: $this->view);
+        if ($this->type === 'text') {
+            return new Content(text: $this->view);
         }
 
-        return $content;
+        // Provide HTML view and, if configured, a plain-text alternative for better client previews
+        return new Content(
+            view: $this->view,
+            text: $this->textView
+        );
     }
 
     /**

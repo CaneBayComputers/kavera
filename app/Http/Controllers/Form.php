@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FormSubmission;
 use App\Mail\Form as MailForm;
 use ElFactory\IpApi\IpApi;
 use Exception;
@@ -20,41 +19,28 @@ use Jenssegers\Agent\Agent;
 
 class Form extends Controller
 {
-    public function process(
-        Request $request,
-        Agent $agent,
-        Generator $faker,
-        string $form_name
-    ): RedirectResponse {
+    public function process(Request $request, Agent $agent, Generator $faker, string $form_name): RedirectResponse
+    {
         $form = _c('form.forms.' . $form_name);
         if (!$form) {
             abort(404);
         }
 
         $form_data = $this->validateInput($request, $form['rules']);
+        $user_fields = $form_data; // preserve raw user fields for webhook
 
         // Dev: generate a non-private/non-reserved fake IP; Prod: real client IP
         if (is_dev()) {
+            $filter_flag = FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE;
             do {
                 $ip_address = $faker->ipv4();
-            } while (
-                !filter_var(
-                    $ip_address,
-                    FILTER_VALIDATE_IP,
-                    FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-                )
-            );
+            } while (!filter_var($ip_address, FILTER_VALIDATE_IP, $filter_flag));
         } else {
             $ip_address = $request->ip();
         }
 
         // Consolidated bot/abuse checks (UA, links, rate limit, recaptcha)
-        $response = $this->looksAutomated(
-            $form_data,
-            $agent,
-            $form_name,
-            $ip_address
-        );
+        $response = $this->looksAutomated($form_data, $agent, $form_name, $ip_address);
 
         if ($response !== null) {
             return back()->withErrors([$response])->withInput();
@@ -63,20 +49,29 @@ class Form extends Controller
         // Always lookup via IpApi (even in dev)
         $form_data = $this->enrichClientMeta($form_data, $agent, $ip_address);
 
-        unset(
-            $form_data['g-recaptcha-response'],
-            $form_data['recaptcha'],
-            $form_data['_token']
-        );
-
-        $this->persistSubmission($form_data);
+        // No DB persistence for now; just generate an ID for downstream usage
+        $submission_id = $this->generateSubmissionId();
 
         if (is_dev()) {
             _l($form_data);
         }
 
+        unset($form_data['token'], $form_data['recaptcha']);
+        unset($user_fields['token'], $user_fields['_token'], $user_fields['recaptcha'], $user_fields['g-recaptcha-response']);
+
         if (!empty($form['mail_to'])) {
-            Mail::to($form['mail_to'])->send(new MailForm($form_data, $form['subject'], $form['view'], $form['type']));
+            Mail::to($form['mail_to'])->send(new MailForm(
+                $form_data,
+                $form['subject'],
+                $form['view'],
+                $form['type'],
+                $form['text_view'] ?? null
+            ));
+        }
+
+        // Fire webhook if configured
+        if (!empty($form['webhook_url'])) {
+            $this->notifyWebhook($form_name, (string)$submission_id, $user_fields, (string)$form['webhook_url']);
         }
 
         $redirect = $form['success_page'] ? redirect($form['success_page']) : back();
@@ -112,12 +107,8 @@ class Form extends Controller
         return null;
     }
 
-    private function looksAutomated(
-        array $data,
-        Agent $agent,
-        string $form_name,
-        string $ip_address
-    ): ?RedirectResponse {
+    private function looksAutomated(array $data, Agent $agent, string $form_name, string $ip_address): ?RedirectResponse
+    {
         // 1) User-Agent heuristic
         if (($agent->deviceType() ?? '') === 'Robot') {
             return 'Device type is robot';
@@ -183,6 +174,7 @@ class Form extends Controller
         $data['languages']   = implode(', ', $languages);
 
         try {
+            // IpApi::lookup() returns an array per library docs
             $data['ip'] = IpApi::default($ip_address)->lookup();
         } catch (Exception $e) {
             $data['ip'] = $ip_address;
@@ -191,10 +183,45 @@ class Form extends Controller
         return $data;
     }
 
-    private function persistSubmission(array $data): void
+    private function generateSubmissionId(): string
     {
-        $submission = new FormSubmission();
-        $submission->data = $data;
-        $submission->save();
+        return Str::ulid()->toBase32();
+    }
+
+    private function notifyWebhook(string $form_name, string $submission_id, array $fields, string $url): void
+    {
+        try {
+            $payload = [
+                'event' => 'form.submitted',
+                'id' => 'evt_' . Str::ulid()->toBase32(),
+                'created_at' => now()->setTimezone('UTC')->toIso8601String(),
+                'data' => [
+                    'form_id' => $form_name,
+                    'submission_id' => 'sub_' . ($submission_id !== '' ? $submission_id : Str::ulid()->toBase32()),
+                    'fields' => $this->flattenFields($fields),
+                ],
+                'meta' => [
+                    'app' => config('app.name'),
+                    'version' => now()->setTimezone('UTC')->toDateString(),
+                ],
+            ];
+
+            Http::timeout(3)
+                ->asJson()
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            if (is_dev()) {
+                _l('Webhook error', $e->getMessage());
+            }
+        }
+    }
+
+    private function flattenFields(array $fields): array
+    {
+        try {
+            return \Illuminate\Support\Arr::dot($fields);
+        } catch (\Throwable $e) {
+            return $fields; // fallback
+        }
     }
 }
