@@ -1,11 +1,12 @@
-<?php 
+<?php
 
 namespace App\Http\Controllers;
 
-use App\Mail\ContactForm;
-use App\FormSubmission;
+use App\Models\FormSubmission;
+use App\Mail\Form as MailForm;
 use ElFactory\IpApi\IpApi;
 use Exception;
+use Faker\Generator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -13,157 +14,187 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 use Jenssegers\Agent\Agent;
 
 class Form extends Controller
 {
-    public function process(Request $request, Agent $agent, $form_name)
+    public function process(
+        Request $request,
+        Agent $agent,
+        Generator $faker,
+        string $form_name
+    ): RedirectResponse {
+        $form = _c('form.forms.' . $form_name);
+        if (!$form) {
+            abort(404);
+        }
+
+        $form_data = $this->validateInput($request, $form['rules']);
+
+        // Dev: generate a non-private/non-reserved fake IP; Prod: real client IP
+        if (is_dev()) {
+            do {
+                $ip_address = $faker->ipv4();
+            } while (
+                !filter_var(
+                    $ip_address,
+                    FILTER_VALIDATE_IP,
+                    FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+                )
+            );
+        } else {
+            $ip_address = $request->ip();
+        }
+
+        // Consolidated bot/abuse checks (UA, links, rate limit, recaptcha)
+        $response = $this->looksAutomated(
+            $form_data,
+            $agent,
+            $form_name,
+            $ip_address
+        );
+
+        if ($response !== null) {
+            return back()->withErrors([$response])->withInput();
+        }
+
+        // Always lookup via IpApi (even in dev)
+        $form_data = $this->enrichClientMeta($form_data, $agent, $ip_address);
+
+        unset(
+            $form_data['g-recaptcha-response'],
+            $form_data['recaptcha'],
+            $form_data['_token']
+        );
+
+        $this->persistSubmission($form_data);
+
+        if (is_dev()) {
+            _l($form_data);
+        }
+
+        if (!empty($form['mail_to'])) {
+            Mail::to($form['mail_to'])->send(new MailForm($form_data, $form['subject'], $form['view'], $form['type']));
+        }
+
+        $redirect = $form['success_page'] ? redirect($form['success_page']) : back();
+        return $redirect->with('success', true);
+    }
+
+    private function validateInput(Request $request, array $rules): array
     {
-        $form = _c('form.names' . $form_name);
+        $data = $request->all();
+        $validator = Validator::make($data, $rules);
 
-        if ( ! $form ) abort(404);
-
-        $form_data = $request->all();
-
-        $validator = Validator::make($form_data, $form['rules']);
-
-        if ( ! empty($form_data['return_to']))
-        {
-            $redirect = redirect($form_data['return_to']);
+        if ($validator->fails()) {
+            throw ValidationException::withMessages($validator->errors()->toArray())
+                ->redirectTo(back()->getTargetUrl());
         }
 
-          else
-        {
-            $redirect = back();
+        return $data;
+    }
+
+    private function rateLimitMessage(string $form_name, string $ip_address): ?string
+    {
+        $key = "form-{$form_name}-attempt-{$ip_address}";
+        if (!Cache::has($key)) {
+            Cache::add($key, 0, _c('form.ip_attempt_timeframe_seconds'));
         }
 
-        if( $validator->fails() )
-        {
-            return $redirect->withErrors($validator)->withInput();
+        $count = (int) Cache::get($key);
+        if (!is_dev() && $count >= _c('form.ip_max_attempts_per_timeframe')) {
+            return 'Too many attempts';
         }
 
-        $remoteip = $_SERVER['REMOTE_ADDR'];
+        Cache::increment($key);
+        return null;
+    }
 
-        $form_data['timestamp'] = now()->toDayDateTimeString() . ' GMT';
-
-        $form_data['device'] = $agent->device();
-
-        $form_data['device_type'] = ucwords($agent->deviceType());
-
-        $form_data['platform'] = $agent->platform();
-
-        $form_data['browser'] = $agent->browser();
-
-        $form_data['languages'] = implode(', ', $agent->languages());
-
-
-        // Reject too many attempts with same IP
-        $cache_key = 'form-' . $form_name . '-attempt-' . $remoteip;
-
-        if( ! $req_count = Cache::get($cache_key) )
-        {
-            $req_count = 1;
-
-            Cache::add($cache_key, $req_count, _c('form.ip_attempt_timeframe_seconds'));
+    private function looksAutomated(
+        array $data,
+        Agent $agent,
+        string $form_name,
+        string $ip_address
+    ): ?RedirectResponse {
+        // 1) User-Agent heuristic
+        if (($agent->deviceType() ?? '') === 'Robot') {
+            return 'Device type is robot';
         }
 
-        if( ! is_dev() && $req_count > _c('form.ip_max_attempts_per_timeframe') )
-        {
-            return $redirect->withErrors(['Too many attempts'])->withInput();
+        // 2) Message contains links
+        if (!empty($data['message']) && preg_match('~https?://~i', $data['message'])) {
+            return 'Please remove links';
         }
 
-        Cache::increment($cache_key);
-
-
-        // Eval user agent
-        if( $form_data['device_type'] == 'Robot' )
-        {
-            return $redirect->withErrors(['Device type is robot'])->withInput();
+        // 3) IP rate limiting
+        $message = $this->rateLimitMessage($form_name, $ip_address);
+        if ($message !== null) {
+            return $message;
         }
 
-
-        // Check message for links
-        if( ! empty($form_data['message']) )
-        {
-            if( preg_match('/http(s)*:/i', $form_data['message']) )
-            {
-                return $redirect->withErrors(['Please remove links'])->withInput();
+        // 4) reCAPTCHA (skip in dev)
+        if (!is_dev()) {
+            $token = $data['recaptcha'] ?? null;
+            $message = $this->recaptchaMessage($token, $ip_address);
+            if ($message !== null) {
+                return $message;
             }
         }
 
+        return null; // looks fine
+    }
 
-        // Recaptcha
-        $recaptcha_data = [
-            'secret' => _c('form.recaptcha.secret_key'),
-            'response' => $form_data['recaptcha'],
-            'remoteip' => $remoteip,
-        ];
+    private function recaptchaMessage(?string $token, string $ip_address): ?string
+    {
+        try {
+            $response = Http::timeout(2)
+                ->asForm()
+                ->post(_c('form.recaptcha.url'), [
+                    'secret'   => _c('form.recaptcha.secret_key'),
+                    'response' => $token,
+                    'remoteip' => $ip_address,
+                ])
+                ->json();
 
-        try
-        {
-            $response = Http::timeout(2)->asForm()->post(_c('form.recaptcha.url'), $recaptcha_data);
-
-            $recaptcha_result = $response->json();
-
-            $request_data['recaptcha_result'] = $recaptcha_result;
-
-            if( ! isset($recaptcha_result['score']) )
-            {
+            if (!isset($response['score'])) {
                 throw new Exception('Recaptcha score returned blank');
             }
 
-            if ( $recaptcha_result['score'] < _c('form.recaptcha.threshold') )
-            {
+            if ($response['score'] < _c('form.recaptcha.threshold')) {
                 throw new Exception('Request appears automated');
             }
+        } catch (Exception $e) {
+            return $e->getMessage();
         }
 
-        catch(Exception $e)
-        {
-            Log::error($e);
+        return null;
+    }
 
-            return $redirect->withErrors([$e->getMessage()])->withInput();
+    private function enrichClientMeta(array $data, Agent $agent, string $ip_address): array
+    {
+        $data['timestamp']   = now()->setTimezone('UTC')->toRfc7231String();
+        $data['device']      = $agent->device();
+        $data['device_type'] = ucwords((string) $agent->deviceType());
+        $data['platform']    = $agent->platform();
+        $data['browser']     = $agent->browser();
+        $languages           = $agent->languages() ?? [];
+        $data['languages']   = implode(', ', $languages);
+
+        try {
+            $data['ip'] = IpApi::default($ip_address)->lookup();
+        } catch (Exception $e) {
+            $data['ip'] = $ip_address;
         }
 
+        return $data;
+    }
 
-        // IP info
-        $form_data['ip'] = $remoteip;
-
-        if( ! is_dev() )
-        {
-            try
-            {
-                $form_data['ip'] = IpApi::default($remoteip)->lookup();
-            }
-
-            catch(Exception $e)
-            {
-                Log::warning($e);
-            }
-        }
-
-
-        // Unset unecessary data
-        unset($form_data['g-recaptcha-response']);
-
-        unset($form_data['recaptcha']);
-
-        unset($form_data['_token']);
-
-
-        // Save to database in case we don't get the email
-        $form_submission = new FormSubmission;
-
-        $form_submission->data = $form_data;
-
-        $form_submission->save();
-
-
-        // Log, save and email form
-        if( is_dev() ) _l($form_data);
-
-        if( $form['mail_to'] ) Mail::to($form['mail_to'])->send(new ContactForm($form_data));
-
-        return $redirect->with('success', true);
+    private function persistSubmission(array $data): void
+    {
+        $submission = new FormSubmission();
+        $submission->data = $data;
+        $submission->save();
     }
 }

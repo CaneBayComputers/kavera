@@ -76,14 +76,11 @@ After reading, summarize each file’s purpose in a few sentences to confirm com
 **Code Style**
 
 * Blade filenames: lowercase-with-dashes
-* Variables: `snake_case`
 * PHP: PSR-12 / Laravel defaults
 
   * 4-space indent
   * PascalCase classes
   * camelCase methods
-* **if / else blocks:** opening brace on new line, closing brace aligned, extra blank line after block
-* **try / catch blocks:** braces on new lines, catch indented within block
 * Maintain generous blank lines for readability; preserve spacing in edits.
 
 ---
@@ -96,6 +93,23 @@ When first initializing or joining the project, the AI agent must:
 2. Confirm understanding of the project structure and conventions.
 3. Only then proceed to perform edits, explanations, or refactors.
 
+## 🧪 PHP Syntax and Code Quality Checks
+
+After updating any PHP file, the agent **must** verify syntax, formatting, and overall code health using the following commands on the specific file changed:
+
+```bash
+# 0. Quick syntax check (lint only)
+php -l <file_path>
+
+# 1. Auto-fix formatting issues (PSR-12)
+phpcbf --standard=~/.config/phpcs-ruleset.xml <file_path>
+
+# 2. Verify style and report remaining issues
+phpcs --standard=~/.config/phpcs-ruleset.xml -w <file_path>
+
+# 3. Detect unused variables and code smells
+phpmd <file_path> text cleancode,codesize,unusedcode
+```
 ---
 
 ### ✅ Example initialization prompt

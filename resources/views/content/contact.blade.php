@@ -1,9 +1,3 @@
-<?php
-
-$site_key = _c('form.recaptcha.site_key');
-
-?>
-
 @extends('templates.main')
 
 @section('content')
@@ -16,10 +10,10 @@ $site_key = _c('form.recaptcha.site_key');
             <div class="alert alert-success" role="alert">
                 Message has been sent!
             </div>
-            @elseif($errors->any())
+            @elseif(session('errors') && session('errors')->any())
             <div class="alert alert-danger">
                 <ul>
-                    @foreach ($errors->all() as $error)
+                    @foreach (session('errors')->all() as $error)
                     <li>{{ $error }}</li>
                     @endforeach
                 </ul>
@@ -27,6 +21,7 @@ $site_key = _c('form.recaptcha.site_key');
             @endif
             <h2>Contact Us</h2>
             <form action="/forms/contact" id="contact-form" method="post">
+                @csrf
                 <div class="mb-3">
                     <label for="fullName" class="form-label">Full Name</label>
                     <input type="text" maxlength="100" name="name" class="form-control" id="fullName" placeholder="Enter your full name" value="{{ old('name') }}" required>
@@ -83,7 +78,6 @@ $site_key = _c('form.recaptcha.site_key');
                     <textarea name="message" maxlength="2000" class="form-control" id="message" rows="4" placeholder="Enter your message" required>{{ old('message') }}</textarea>
                 </div>
                 @csrf
-                <input type="hidden" id="timezone" name="timezone" value="">
                 <input type="hidden" id="recaptcha" name="recaptcha" value="">
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
@@ -95,13 +89,14 @@ $site_key = _c('form.recaptcha.site_key');
 
 @push('script')
 
-<script src="https://www.google.com/recaptcha/api.js?render={!! $site_key !!}"></script>
+@if(!is_dev())
+<script src="https://www.google.com/recaptcha/api.js?render={!! _c('form.recaptcha.site_key') !!}"></script>
 
 <script>
 
 document.getElementById('contact-form').onsubmit = function(e) {
     grecaptcha.ready(function() {
-        grecaptcha.execute('{!! $site_key !!}', {action: 'submit'}).then(function(token) {
+        grecaptcha.execute('{!! _c('form.recaptcha.site_key') !!}', {action: 'submit'}).then(function(token) {
             document.getElementById("recaptcha").value = token;
             e.target.submit();
         });
@@ -109,7 +104,7 @@ document.getElementById('contact-form').onsubmit = function(e) {
     return false;
 };
 
-document.getElementById('timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+@endif
 
 </script>
 
