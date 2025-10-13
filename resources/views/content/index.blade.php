@@ -7,8 +7,8 @@
   <div class="container py-4">
     <div class="row align-items-center g-4">
       <div class="col-lg-7">
-        <h1 class="display-5 fw-bold mb-3">Laravel Sitekit: Turn‑Key, Fast, Flexible.</h1>
-        <p class="lead mb-4">Flat‑file speed with full‑stack power. Pages are Blade, content validated in Redis, and forms ship with email + webhooks. Add events, galleries, blog posts, and stock images—no plugin drama.</p>
+        <h1 class="display-5 fw-bold mb-3">Sitekit on Laravel: Fast Pages. Easy AI Agent Changes.</h1>
+        <p class="lead mb-4">Flat‑file speed with full‑stack power—so <strong>AI agents can edit pages directly</strong>, without wrestling a database like WordPress. Pages are Blade, content is pre‑validated in Redis, and forms ship with email + webhooks. Add events, galleries, blog posts, and stock images—<strong>no plugin drama</strong>.</p>
         <a href="/features" class="btn btn-light btn-lg me-2">See Features</a>
         <a href="/#footer" class="btn btn-outline-light btn-lg">Get Updates</a>
       </div>
@@ -119,7 +119,10 @@
           <div class="col-md-6">
             <div class="p-3 border bg-white h-100">
               <h6 class="mb-1">Podium‑Ready</h6>
-              <p class="mb-0">Run everything in containers with Podium. Mailhog, Redis, and PHP are ready from the start.</p>
+              <p class="mb-2">Run everything in containers with <a class="text-decoration-underline" href="https://github.com/CaneBayComputers/podium-cli" target="_blank" rel="noopener">Podium CLI</a>.</p>
+              <pre class="small bg-light p-2 mb-0"><code>podium clone https://github.com/CaneBayComputers/laravel-flat-file-website.git
+podium art app:agent-brief</code></pre>
+              <p class="small mb-0">Clone Sitekit, run the Agent Brief wizard, and start customizing immediately.</p>
             </div>
           </div>
           <div class="col-md-6">

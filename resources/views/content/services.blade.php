@@ -8,73 +8,60 @@
     <div class="row">
         <!-- Service Details -->
         <div class="col-md-8">
-            <h1>Our Services</h1>
-            <p class="lead">Discover what we offer to meet your needs.</p>
-
-            <hr>
-
-            <!-- Service 1 -->
-            <div class="mb-4">
-                <h3>Service 1</h3>
-                <p>Our tailored business solutions are designed to deliver measurable results. From strategic planning to operational optimization, Service 1 ensures your company thrives in a competitive market with innovative and efficient strategies.</p>
+            <h1>Services (Pixabay Example)</h1>
+            <p class="lead">This page shows how a cached Pixabay search can drive a service gallery—no API calls at request time.</p>
+            <div class="alert alert-info small">
+              <div><strong>Search terms used:</strong> <code>abstract geometric memphis pattern</code></div>
+              <div><strong>Command:</strong> <code>podium art app:pixabay-search "abstract geometric memphis pattern" --per_page=9 &gt; storage/app/pixabay/services.json</code></div>
             </div>
 
-            <!-- Service 2 -->
-            <div class="mb-4">
-                <h3>Service 2</h3>
-                <p>Experience the next level of support and innovation with Service 2. We provide cutting-edge technology solutions and 24/7 support to ensure your business operations are always running smoothly and effectively.</p>
-            </div>
+            @php
+              $hits = [];
+              $jsonPath = storage_path('app/pixabay/services.json');
+              if (file_exists($jsonPath)) {
+                $payload = json_decode(file_get_contents($jsonPath), true);
+                $hits = $payload['hits'] ?? [];
+              }
+            @endphp
 
-            <!-- Service 3 -->
-            <div class="mb-4">
-                <h3>Service 3</h3>
-                <p>Service 3 sets a new standard in the industry by combining rapid response times, advanced customization, and seamless client onboarding. Compare us to the competition and see how we consistently outperform with a client satisfaction rate of 98%.</p>
-            </div>
-
-            <!-- Frequently Asked Questions (Accordion) -->
-            <div class="accordion" id="faqAccordion">
-                <!-- FAQ 1 -->
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="faqHeadingOne">
-                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapseOne" aria-expanded="true" aria-controls="faqCollapseOne">
-                            What payment methods do you accept?
-                        </button>
-                    </h2>
-                    <div id="faqCollapseOne" class="accordion-collapse collapse show" aria-labelledby="faqHeadingOne" data-bs-parent="#faqAccordion">
-                        <div class="accordion-body">
-                            We accept all major credit cards and PayPal for payment.
-                        </div>
-                    </div>
+            <div class="row g-3 mb-4">
+              <!-- Bike Repair -->
+              <div class="col-6 col-md-4">
+                <div class="border bg-white h-100">
+                  <img class="img-fluid" src="https://pixabay.com/get/g449dd7dae096c0289a2a6258f34e26fad1ab0c1929f374a13f902e73b0644a5a737a0a89876a79341e469e4c8f95ff50027933a143f3e2b08807613b68658ba4_640.jpg" alt="Bike repair workshop" loading="lazy">
+                  <div class="p-2 small text-muted">Bike Repair &amp; Tune‑Ups</div>
                 </div>
-
-                <!-- FAQ 2 -->
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="faqHeadingTwo">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapseTwo" aria-expanded="false" aria-controls="faqCollapseTwo">
-                            How can I contact customer support?
-                        </button>
-                    </h2>
-                    <div id="faqCollapseTwo" class="accordion-collapse collapse" aria-labelledby="faqHeadingTwo" data-bs-parent="#faqAccordion">
-                        <div class="accordion-body">
-                            You can reach our customer support team via email or phone during business hours.
-                        </div>
-                    </div>
+              </div>
+              <!-- Home Cleaning -->
+              <div class="col-6 col-md-4">
+                <div class="border bg-white h-100">
+                  <img class="img-fluid" src="https://pixabay.com/get/g7288ed115cfa84ca14866e58ccd54c42bc88a9ee12f3edc3b10176a257c95c9aeba7fb24ba621f13ac8726166e2a3d42_640.jpg" alt="Vacuum cleaning carpet" loading="lazy">
+                  <div class="p-2 small text-muted">Home Cleaning Services</div>
                 </div>
-
-                <!-- FAQ 3 -->
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="faqHeadingThree">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapseThree" aria-expanded="false" aria-controls="faqCollapseThree">
-                            Do you offer customized solutions?
-                        </button>
-                    </h2>
-                    <div id="faqCollapseThree" class="accordion-collapse collapse" aria-labelledby="faqHeadingThree" data-bs-parent="#faqAccordion">
-                        <div class="accordion-body">
-                            Yes, we provide tailored solutions based on specific client requirements.
-                        </div>
-                    </div>
+              </div>
+              <!-- Landscaping -->
+              <div class="col-6 col-md-4">
+                <div class="border bg-white h-100">
+                  <img class="img-fluid" src="https://pixabay.com/get/g929a044e70c1a95d4b72d9bf8df9b4aa31a86078fd5a6d21e1045f4174586562ce98cebb6dfdb2483b62a072db17e506b9fd0148d8f09842377cf9abc7470395_640.jpg" alt="Formal garden landscaping" loading="lazy">
+                  <div class="p-2 small text-muted">Landscaping &amp; Yard Care</div>
                 </div>
+              </div>
+              <!-- Pet Grooming -->
+              <div class="col-6 col-md-4">
+                <div class="border bg-white h-100">
+                  <img class="img-fluid" src="https://pixabay.com/get/g86eff68c8a51cb9b35cd74fdae60f15ae63e0f52e8942c30df0ee92a12e2bda0713760d46d2aab28bd54052192d07793_640.jpg" alt="Dog bath grooming" loading="lazy">
+                  <div class="p-2 small text-muted">Pet Grooming</div>
+                </div>
+              </div>
+              <!-- Tutoring -->
+              <div class="col-6 col-md-4">
+                <div class="border bg-white h-100">
+                  <img class="img-fluid" src="https://pixabay.com/get/gc0feec739448360cef7c0d847652d0105ed23ab17c7e8a7463b86e8b0faf023ca7deb8137957ad057d9c79c7fa1e5e25d15ed190e0e7c10ded836719752feab8_640.jpg" alt="Volunteer tutoring" loading="lazy">
+                  <div class="p-2 small text-muted">Tutoring &amp; Coaching</div>
+                </div>
+              </div>
             </div>
+
         </div>
 
         <!-- Sidebar with Contact Information -->
