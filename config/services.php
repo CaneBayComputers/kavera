@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    'eventbrite' => [
+        // Use the Private token (Personal OAuth token). Fallback to legacy API key var if present.
+        'private_token' => env('EVENTBRITE_PRIVATE_TOKEN', env('EVENTBRITE_API_KEY')),
+        'organization_id' => env('EVENTBRITE_ORGANIZATION_ID'),
+        // Comma-separated statuses, e.g., "live,started"; API supports "live", "started", "ended", etc.
+        'status' => env('EVENTBRITE_STATUS', 'live,started'),
+        // Eventbrite docs: "current_future" yields ongoing and upcoming
+        'time_filter' => env('EVENTBRITE_TIME_FILTER', 'current_future'),
+        'page_size' => env('EVENTBRITE_PAGE_SIZE', 10),
+        'cache_seconds' => env('EVENTBRITE_CACHE_SECONDS', 300),
+        'cache_key' => env('EVENTBRITE_CACHE_KEY', 'eventbrite.events'),
+        // Expand related resources for richer display; include image/logo and venue.
+        // Event times and URL are part of the base event fields.
+        'expand' => env('EVENTBRITE_EXPAND', 'venue,logo,organizer'),
+    ],
+
+    'pixabay' => [
+        'key' => env('PIXABAY_API_KEY'),
+        'base_url' => env('PIXABAY_BASE_URL', 'https://pixabay.com/api/'),
+        'timeout' => env('PIXABAY_TIMEOUT', 6),
+    ],
+
 ];

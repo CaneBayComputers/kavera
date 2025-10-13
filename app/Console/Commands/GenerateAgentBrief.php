@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 
 use function Laravel\Prompts\{text, textarea, select, multiselect, confirm};
@@ -118,6 +119,39 @@ class GenerateAgentBrief extends Command
         $imagesPath = text('Images directory (relative to project root)', default: 'public/images');
         $references = textarea('Example websites/pages (one per line or comma-separated)', default: '');
 
+        // Simplified image plan
+        $usePlaceholders = confirm('Use blank placeholders (placehold.co) for all images?', default: false);
+
+        $localImages = [];
+        $localCount = 0;
+        $mixStock = false;
+        $pixabayKeywords = [];
+        $pixabayResults = [];
+
+        if (! $usePlaceholders) {
+            [$localImages, $localCount] = $this->findLocalImages($imagesPath);
+            $mixStock = confirm("Found {$localCount} local image(s) in {$imagesPath}. Mix in stock photos from Pixabay?", default: false);
+
+            if ($mixStock) {
+                $pixabayEnabled = trim((string) config('services.pixabay.key')) !== '';
+                if (! $pixabayEnabled) {
+                    $this->warn('PIXABAY_API_KEY not configured; skipping Pixabay search.');
+                } else {
+                    $kwRaw = textarea('Pixabay search keywords (one per line)', default: "hero\nproduct\nteam");
+                    $pixabayKeywords = $this->splitLines($kwRaw);
+                    foreach ($pixabayKeywords as $kw) {
+                        $urls = $this->pixabayFetchUrls($kw, 6);
+                        if (!empty($urls)) {
+                            $pixabayResults[] = [
+                                'keyword' => $kw,
+                                'urls' => $urls,
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
         // SEO and CTAs
         $ctas = textarea('Primary Calls to Action (comma-separated)', default: 'Contact Us, Get a Quote');
         $seo  = textarea('SEO keywords (comma-separated)', default: 'brand, services, location');
@@ -184,6 +218,16 @@ class GenerateAgentBrief extends Command
             'ctas'        => $ctas,
             'seo'         => $seo,
             'mailTo'      => $mailTo,
+            'imagePlan'   => [
+                'placeholders' => $usePlaceholders,
+                'local'        => [
+                    'path'    => $imagesPath,
+                    'count'   => $localCount,
+                    'samples' => array_slice($localImages, 0, 10),
+                ],
+                'mixStock'     => $mixStock,
+                'pixabay'      => $pixabayResults,
+            ],
 
             // business profile
             'phone'       => $phone,
@@ -230,6 +274,20 @@ class GenerateAgentBrief extends Command
             'filenames'  => "Infer roles from filenames (e.g., home-hero-1.jpg, services-card-1.jpg) and aspect ratios.",
             default      => "Use placehold.co placeholders sized appropriately and wire helpers for future swap-in.",
         };
+
+        // Override with simplified plan if provided
+        $plan = $d['imagePlan'] ?? null;
+        if (is_array($plan)) {
+            if (!empty($plan['placeholders'])) {
+                $imageNotes = 'Use blank placeholders from placehold.co for all images.';
+            } else {
+                $localCount = (int) ($plan['local']['count'] ?? 0);
+                $imageNotes = "Use local images from {$d['imagesPath']} (found {$localCount}).";
+                if (!empty($plan['mixStock']) && !empty($plan['pixabay'])) {
+                    $imageNotes .= ' Mix in select stock images from Pixabay based on provided keywords.';
+                }
+            }
+        }
 
         $tagline = trim((string) $d['tagline']) !== '' ? "Tagline: {$d['tagline']}\n" : '';
         $paletteUrl = trim((string) ($d['paletteUrl'] ?? ''));
@@ -304,6 +362,34 @@ class GenerateAgentBrief extends Command
             }
         }
 
+        // Detailed image sources block
+        $imageSources = '';
+        if (is_array($plan)) {
+            if (!empty($plan['placeholders'])) {
+                $imageSources .= "\nImage sources\n- Placeholders: placehold.co (blank placeholders)\n";
+            } else {
+                $samples = $plan['local']['samples'] ?? [];
+                $imageSources .= "\nImage sources\n- Local images path: {$d['imagesPath']} (" . ((int)($plan['local']['count'] ?? 0)) . ")\n";
+                if (!empty($samples)) {
+                    foreach ($samples as $s) {
+                        $imageSources .= "  - {$s}\n";
+                    }
+                }
+                if (!empty($plan['pixabay'])) {
+                    foreach ($plan['pixabay'] as $row) {
+                        $kw = $row['keyword'] ?? '';
+                        $urls = $row['urls'] ?? [];
+                        if (!empty($urls)) {
+                            $imageSources .= "- Pixabay [{$kw}]\n";
+                            foreach ($urls as $u) {
+                                $imageSources .= "  - {$u}\n";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return <<<PROMPT
 Follow the AI Agent Onboarding Protocol in AGENTS.md. Read and summarize each file listed under Step 1 before continuing. Confirm adherence to conventions, then proceed.
 
@@ -318,6 +404,7 @@ Context
  - Color palette: {$d['colors']}
  - Palette URL: {$paletteUrl}
 - Images: {$d['imagesPath']} – Strategy: {$imageNotes}
+{$imageSources}
 - Primary CTAs: {$d['ctas']}
 - SEO keywords: {$d['seo']}
 - Contact recipient: {$d['mailTo']}
@@ -375,6 +462,58 @@ PROMPT;
             }
         }
         return $out;
+    }
+
+    /**
+     * Return [list, count] of local image files under the given relative path.
+     */
+    private function findLocalImages(string $relativePath): array
+    {
+        $abs = base_path(trim($relativePath, '/'));
+        $list = [];
+        if (File::exists($abs)) {
+            $files = File::allFiles($abs);
+            foreach ($files as $f) {
+                $ext = strtolower($f->getExtension());
+                if (in_array($ext, ['jpg','jpeg','png','gif','webp','svg'], true)) {
+                    // make path relative for readability in briefs
+                    $list[] = str_replace(base_path() . DIRECTORY_SEPARATOR, '', $f->getPathname());
+                }
+            }
+        }
+        return [$list, count($list)];
+    }
+
+    /**
+     * Run the internal Pixabay search command and return a list of image URLs.
+     */
+    private function pixabayFetchUrls(string $keyword, int $perPage = 6): array
+    {
+        try {
+            $code = Artisan::call('app:pixabay-search', [
+                'query' => [$keyword],
+                '--per_page' => $perPage,
+                '--safesearch' => '1',
+            ]);
+            if ($code !== 0) {
+                return [];
+            }
+            $raw = (string) Artisan::output();
+            $json = json_decode($raw, true);
+            if (!is_array($json) || !isset($json['hits'])) {
+                return [];
+            }
+            $urls = [];
+            foreach ($json['hits'] as $hit) {
+                $u = $hit['largeImageURL'] ?? ($hit['webformatURL'] ?? null);
+                if (is_string($u) && $u !== '') {
+                    $urls[] = $u;
+                }
+            }
+            return $urls;
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     private function askPageBrief(string $slug, ?string $defaultTone = null): array

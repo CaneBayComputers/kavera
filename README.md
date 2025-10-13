@@ -40,6 +40,31 @@ The contact page ships with a ready-to-send email flow, relaying enquiries throu
 
 ---
 
+### 🧩 Integrations
+
+Turn‑key add‑ons you can flip on with env keys and Podium commands: Eventbrite events, stock images via Pixabay, agent brief generator, and form mailer with webhook. Check `.env.example` for what’s available.
+
+---
+
+### 🧰 Content Page Prompt Creator (Agent Brief Wizard)
+
+Use an interactive Artisan command to generate a complete AI Agent prompt tailored to your site and content. It asks about pages, forms, tone, sections, business profile, demographics, social links, and more—then prints and saves a ready‑to‑paste brief that instructs agents to follow AGENTS.md.
+
+Run from the project directory:
+
+```bash
+podium art app:agent-brief
+```
+
+What you get:
+- Structured prompt with page‑by‑page section hints
+- Color palette (Coolors.co URL supported) and style notes
+- References and existing links for inspiration
+- Form targets, success redirects, and webhook notes
+
+
+---
+
 ### 🛡️ Security
 
 * Only alphanumeric, slash, and dash URLs allowed
@@ -51,24 +76,28 @@ The contact page ships with a ready-to-send email flow, relaying enquiries throu
 
 ### 💬 Notes
 
-* After adding or removing `.blade.php` files in `resources/views/content/`, re-run:
+After adding or removing `.blade.php` files in `resources/views/content/`, refresh the content list with Podium:
 
-  ```bash
-  php artisan app:update-content-list
-  ```
-* If you have Podium CLI installed use `podium art app:update-content-list` to run any Laravel Artisan commands inside the Docker container.
+```bash
+podium art app:update-content-list
+```
 
 ---
 
 ### 🤖 Agent‑Ready Workflow (Podium + Flat‑File)
 
-This repo is designed to be “agent‑friendly.” Given a content brief and a folder of images, an AI agent can scaffold a full site using Podium‑managed containers and this flat‑file architecture:
+Agent‑friendly by design. Drop images (and an optional `resources/content/<page>.yaml` manifest) and let your automation assemble pages under `resources/views/content/` — all inside Podium (`podium art`, `podium composer`, `podium php`).
 
-- Drop images into `public/images` and optionally describe sections in `resources/content/<page>.yaml`.
-- The agent parses filenames and/or the YAML manifest to assemble pages under `resources/views/content/` (hero, cards, galleries, etc.).
-- Forms and email are already wired (see `config/form.php`), so new forms can reuse the same flow.
-- Run inside the container with Podium (`podium art`, `podium composer`, `podium php`) for a turn‑key experience.
+Clone with Podium, place content, and render pages — no database required.
 
-This enables one‑shot site generation: clone via Podium, place content, and render pages—no database required.
+---
+
+### 🎟️ Eventbrite
+
+Built‑in events page. Add your private token and organization ID to `.env`, sync with Podium, and visit `/events`.
+
+- Sync events cache: `podium art app:update-eventbrite`
+- Discover org ID: `podium art app:eventbrite-organizations`
+- Refresh app caches after `.env` changes: `podium cache-refresh`
 
 ---

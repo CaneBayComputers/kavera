@@ -283,3 +283,64 @@ function _l(...$params)
         logger()->log($opts['level'], $out);
     }
 }
+
+if (!function_exists('eventbrite_enabled')) {
+    function eventbrite_enabled(): bool
+    {
+        $token = config('services.eventbrite.private_token');
+        $orgId = config('services.eventbrite.organization_id');
+        return !empty($token) && !empty($orgId);
+    }
+}
+
+if (!function_exists('eventbrite_fetch_events')) {
+    /**
+     * Read pre-fetched Eventbrite events from cache (populated by artisan command).
+     * Always returns list ordered from soonest to latest by start time.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    function eventbrite_fetch_events(): array
+    {
+        $orgId = (string) config('services.eventbrite.organization_id');
+        $privateToken = (string) config('services.eventbrite.private_token');
+        if ($orgId === '' || $privateToken === '') {
+            return [];
+        }
+
+        $cacheKey = (string) config('services.eventbrite.cache_key', 'eventbrite.events');
+        $events = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        if (!is_array($events)) {
+            return [];
+        }
+
+        // Ensure soonest → latest ordering by start time
+        usort($events, static function ($a, $b) {
+            $aTime = strtotime($a['start']['utc'] ?? $a['start']['local'] ?? '');
+            $bTime = strtotime($b['start']['utc'] ?? $b['start']['local'] ?? '');
+            return $aTime <=> $bTime;
+        });
+
+        return $events;
+    }
+}
+
+if (!function_exists('eventbrite_image_url')) {
+    /**
+     * Extracts an image URL from an Eventbrite event object.
+     */
+    function eventbrite_image_url(array $event): ?string
+    {
+        // Eventbrite responds with 'logo' => ['url' => '...', 'original' => ['url' => '...']]
+        $logo = $event['logo'] ?? null;
+        if (is_array($logo)) {
+            if (!empty($logo['original']['url'])) {
+                return (string) $logo['original']['url'];
+            }
+            if (!empty($logo['url'])) {
+                return (string) $logo['url'];
+            }
+        }
+        return null;
+    }
+}
