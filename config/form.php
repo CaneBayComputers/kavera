@@ -60,47 +60,24 @@ return [
                     // 'headers' => ['Authorization' => 'Bearer ...'],
                     // 'options' => ['flatten' => true],
                 ],
+
+                // Zapier webook integration
+                // [
+                //     'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
+                //     'adapter' => App\FormAdapters\ZapierAdapter::class,
+                // ],
+
+                // Mailchimp webhook integration
+                // [
+                //     'adapter' => App\FormAdapters\MailchimpAdapter::class,
+                //     'options' => [
+                //         'api_key' => env('MAILCHIMP_API_KEY'),
+                //         'dc'      => env('MAILCHIMP_DC'),
+                //         'list_id' => env('MAILCHIMP_LIST_ID'),
+                //         'status'  => env('MAILCHIMP_STATUS', 'subscribed'),
+                //     ],
+                // ],
             ],
-
-            // --- Adapter Examples (choose one) ---
-
-            // Example A) Zapier Catch Hook (passthrough fields)
-            //
-            // 'webhooks' => [[
-            //     'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
-            //     'adapter' => App\FormAdapters\ZapierAdapter::class,
-            //     // 'options' => ['include_context' => true], // optional
-            // ]],
-
-            // Example B) Mailchimp (member upsert)
-            //
-            // 'webhooks' => [[
-            //     'adapter' => App\FormAdapters\MailchimpAdapter::class,
-            //     'options' => [
-            //         'api_key' => env('MAILCHIMP_API_KEY'),
-            //         'dc'      => env('MAILCHIMP_DC'), // e.g. us21
-            //         'list_id' => env('MAILCHIMP_LIST_ID'),
-            //         'status'  => env('MAILCHIMP_STATUS', 'subscribed'),
-            //     ],
-            // ]],
-
-            // Example C) Multiple webhooks (Zapier + Mailchimp)
-            //
-            // 'webhooks' => [
-            //     [
-            //         'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
-            //         'adapter' => App\FormAdapters\ZapierAdapter::class,
-            //     ],
-            //     [
-            //         'adapter' => App\FormAdapters\MailchimpAdapter::class,
-            //         'options' => [
-            //             'api_key' => env('MAILCHIMP_API_KEY'),
-            //             'dc'      => env('MAILCHIMP_DC'),
-            //             'list_id' => env('MAILCHIMP_LIST_ID'),
-            //             'status'  => env('MAILCHIMP_STATUS', 'subscribed'),
-            //         ],
-            //     ],
-            // ],
         ],
 
         'signup' => [

@@ -80,9 +80,9 @@ class UpdateEventbrite extends Command
             });
 
             $cacheKey = (string) config('services.eventbrite.cache_key', 'eventbrite.events');
-            $ttl = (int) config('services.eventbrite.cache_seconds', 300);
 
-            Cache::put($cacheKey, $events, $ttl);
+            // Save indefinitely (no TTL)
+            Cache::forever($cacheKey, $events);
 
             $this->info('Eventbrite events saved to Redis: ' . count($events) . ' event(s).');
             return self::SUCCESS;
