@@ -46,6 +46,47 @@ Turn‑key add‑ons you can flip on with env keys and Podium commands: Eventbri
 
 ---
 
+### 🔌 Webhook Adapters (Pluggable)
+
+Web form submissions can be forwarded to external services via a flexible adapter system.
+
+- Built‑in adapters:
+  - Mailchimp (list subscribe/upsert)
+  - Zapier (catch hook, passthrough fields)
+- Per‑form configuration uses `webhooks` (array). Backward compatible with the original `CONTACT_FORM_WEBHOOK_URL`.
+- Supports HTTP method, headers, and adapter options per webhook.
+
+Quick start (examples shown for the `contact` form in `config/form.php`):
+
+1) Zapier (via `webhooks`)
+
+```php
+'webhooks' => [[
+    'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
+    'adapter' => App\FormAdapters\ZapierAdapter::class,
+    // optional: 'options' => ['include_context' => true],
+]]
+```
+
+2) Mailchimp (upsert)
+
+```php
+'webhooks' => [[
+    // Leave url empty to let the adapter compute it from options
+    'adapter' => App\FormAdapters\MailchimpAdapter::class,
+    'options' => [
+        'api_key'   => env('MAILCHIMP_API_KEY'),
+        'dc'        => env('MAILCHIMP_DC'),      // e.g. us21
+        'list_id'   => env('MAILCHIMP_LIST_ID'),
+        'status'    => env('MAILCHIMP_STATUS', 'subscribed'),
+    ],
+]]
+```
+
+Notes
+- The Mailchimp adapter computes the member upsert URL using `dc`, `list_id`, and the submitted `email` (md5 hash). It sends Authorization: Basic with your API key. `status` can be set via `MAILCHIMP_STATUS`.
+- Prefer `webhooks: [ ... ]` for multiple destinations; each can use a different adapter and headers.
+
 ### 🧰 Content Page Prompt Creator (Agent Brief Wizard)
 
 Use an interactive Artisan command to generate a complete AI Agent prompt tailored to your site and content. It asks about pages, forms, tone, sections, business profile, demographics, social links, and more—then prints and saves a ready‑to‑paste brief that instructs agents to follow AGENTS.md.

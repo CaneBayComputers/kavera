@@ -27,11 +27,6 @@ After reading, summarize each file’s purpose in a few sentences to confirm com
 * Built-in form processing
 * Web form mailing
 
-**About**
-
-* Flat-file content system
-* Built-in form processing
-
 **Tech Stack**
 
 * PHP 8.3
@@ -70,7 +65,6 @@ After reading, summarize each file’s purpose in a few sentences to confirm com
   ```
 
   Run this whenever content files are added, removed, or modified.
-* Use `placehold.co` for image placeholders.
 * All links must use root-scoped anchors (e.g., `/` or `/#contact`) for navigation consistency.
 * Custom helpers live in `app/helpers.php` and include:
 
@@ -105,6 +99,68 @@ When first initializing or joining the project, the AI agent must:
    * `resources/views/emails/contact.blade.php`
 3. Confirm understanding of the project structure and conventions.
 4. Only then proceed to perform edits, explanations, or refactors.
+
+---
+
+## 🔌 Webhook Adapters (For Agents)
+
+Form webhooks are adapter‑driven and configurable per form using `webhooks` (array). This keeps controllers agnostic and lets agents add new destinations without touching core flow.
+
+- Interface: `App\FormAdapters\Contracts\FormAdapter` with:
+  - `transform($formName, $submissionId, array $fields, array $context): array` → return JSON‑serializable payload
+  - `requestOptions(array $context): array` → return `['method' => 'POST', 'headers' => [...], 'url' => '...']` (any key optional)
+- Context: includes `app`, `version`, `created_at`, `event_id`, `form_name`, `submission_id`, `fields` (raw user fields), and `options` (from config).
+- Built‑in adapters:
+  - `DefaultEnvelopeAdapter` → current envelope with optional flatten
+  - `PassthroughAdapter` → raw fields, optional minimal context
+  - `ZapierAdapter` → convenience passthrough (POST)
+  - `MailchimpAdapter` → computes member upsert URL using `dc`, `list_id`, and md5(email); sets Basic Auth header from API key
+
+### Configure webhooks
+
+Per form (`config/form.php`), define:
+
+- `webhooks` → array of webhook definitions (preferred and standard)
+- Legacy `*_WEBHOOK_URL` envs are still honored automatically (mapped to a single webhook entry).
+
+Webhook definition keys:
+- `url` (string, optional if adapter can compute)
+- `adapter` (class string, default `DefaultEnvelopeAdapter`)
+- `method` (e.g., POST/PUT)
+- `headers` (array)
+- `timeout` (int seconds, default 3)
+- `options` (array passed to adapter)
+
+Examples:
+
+Zapier
+```php
+'webhooks' => [[
+  'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
+  'adapter' => App\FormAdapters\ZapierAdapter::class,
+]]
+```
+
+Mailchimp upsert
+```php
+'webhooks' => [[
+  'adapter' => App\FormAdapters\MailchimpAdapter::class,
+  'options' => [
+    'api_key' => env('MAILCHIMP_API_KEY'),
+    'dc' => env('MAILCHIMP_DC'),
+    'list_id' => env('MAILCHIMP_LIST_ID'),
+    'status' => env('MAILCHIMP_STATUS', 'subscribed'),
+  ],
+]]
+```
+
+### Adding a new adapter
+
+1) Create a class under `app/FormAdapters` implementing `FormAdapter`.
+2) Map your input `$fields` to the target API payload in `transform()`.
+3) Set HTTP details in `requestOptions()` (method/headers, and optionally `url`). If URL depends on fields, compute it using `$context['fields']`.
+4) Reference your adapter in `config/form.php` under the intended form.
+5) Run quality checks on changed files (see below).
 
 ---
 

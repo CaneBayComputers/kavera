@@ -50,8 +50,57 @@ return [
             // Values: view | text
             'type' => 'view',
 
-            // Optional webhook endpoint to receive form submissions
-            'webhook_url' => env('CONTACT_FORM_WEBHOOK_URL'),
+            // Optional webhook(s) to receive form submissions
+            // Backward compatible: if only CONTACT_FORM_WEBHOOK_URL is set, it will be used automatically.
+            'webhooks' => [
+                [
+                    'url' => env('CONTACT_FORM_WEBHOOK_URL'),
+                    'adapter' => App\FormAdapters\DefaultEnvelopeAdapter::class,
+                    // 'method' => 'POST',
+                    // 'headers' => ['Authorization' => 'Bearer ...'],
+                    // 'options' => ['flatten' => true],
+                ],
+            ],
+
+            // --- Adapter Examples (choose one) ---
+
+            // Example A) Zapier Catch Hook (passthrough fields)
+            //
+            // 'webhooks' => [[
+            //     'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
+            //     'adapter' => App\FormAdapters\ZapierAdapter::class,
+            //     // 'options' => ['include_context' => true], // optional
+            // ]],
+
+            // Example B) Mailchimp (member upsert)
+            //
+            // 'webhooks' => [[
+            //     'adapter' => App\FormAdapters\MailchimpAdapter::class,
+            //     'options' => [
+            //         'api_key' => env('MAILCHIMP_API_KEY'),
+            //         'dc'      => env('MAILCHIMP_DC'), // e.g. us21
+            //         'list_id' => env('MAILCHIMP_LIST_ID'),
+            //         'status'  => env('MAILCHIMP_STATUS', 'subscribed'),
+            //     ],
+            // ]],
+
+            // Example C) Multiple webhooks (Zapier + Mailchimp)
+            //
+            // 'webhooks' => [
+            //     [
+            //         'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
+            //         'adapter' => App\FormAdapters\ZapierAdapter::class,
+            //     ],
+            //     [
+            //         'adapter' => App\FormAdapters\MailchimpAdapter::class,
+            //         'options' => [
+            //             'api_key' => env('MAILCHIMP_API_KEY'),
+            //             'dc'      => env('MAILCHIMP_DC'),
+            //             'list_id' => env('MAILCHIMP_LIST_ID'),
+            //             'status'  => env('MAILCHIMP_STATUS', 'subscribed'),
+            //         ],
+            //     ],
+            // ],
         ],
 
         'signup' => [
@@ -75,8 +124,13 @@ return [
             // Values: view | text
             'type' => 'view',
 
-            // Optional webhook
-            'webhook_url' => env('SIGNUP_FORM_WEBHOOK_URL'),
+            // Optional webhooks
+            'webhooks' => [
+                [
+                    'url' => env('SIGNUP_FORM_WEBHOOK_URL'),
+                    'adapter' => App\FormAdapters\DefaultEnvelopeAdapter::class,
+                ],
+            ],
         ],
     ],
 ];

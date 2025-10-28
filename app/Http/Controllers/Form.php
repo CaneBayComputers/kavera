@@ -64,9 +64,15 @@ class Form extends Controller
             Mail::to($form['mail_to'])->send($mail_form);
         }
 
-        // Fire webhook if configured
-        if (!empty($form['webhook_url'])) {
-            $this->notifyWebhook($form_name, (string)$submission_id, $user_fields, (string)$form['webhook_url']);
+        // Fire webhook(s) if configured (prefer 'webhooks' array)
+        if (!empty($form['webhooks']) && is_array($form['webhooks'])) {
+            foreach ((array) $form['webhooks'] as $webhook) {
+                $this->notifyWebhook($form_name, (string) $submission_id, $user_fields, (array) $webhook);
+            }
+        } elseif (!empty($form['webhook_url'])) { // backward compatibility
+            $this->notifyWebhook($form_name, (string) $submission_id, $user_fields, [
+                'url' => (string) $form['webhook_url'],
+            ]);
         }
 
         $successPage = $form['success_page'] ?? null;
@@ -223,40 +229,52 @@ class Form extends Controller
         return Str::ulid()->toBase32();
     }
 
-    private function notifyWebhook(string $form_name, string $submission_id, array $fields, string $url): void
+    private function notifyWebhook(string $form_name, string $submission_id, array $fields, array $webhook): void
     {
         try {
-            $payload = [
-                'event' => 'form.submitted',
-                'id' => 'evt_' . Str::ulid()->toBase32(),
+            $url = (string) ($webhook['url'] ?? '');
+            if ($url === '') {
+                return;
+            }
+
+            $context = [
+                'app' => config('app.name'),
+                'version' => now()->setTimezone('UTC')->toDateString(),
                 'created_at' => now()->setTimezone('UTC')->toIso8601String(),
-                'data' => [
-                    'form_id' => $form_name,
-                    'submission_id' => 'sub_' . ($submission_id !== '' ? $submission_id : Str::ulid()->toBase32()),
-                    'fields' => $this->flattenFields($fields),
-                ],
-                'meta' => [
-                    'app' => config('app.name'),
-                    'version' => now()->setTimezone('UTC')->toDateString(),
-                ],
+                'event_id' => Str::ulid()->toBase32(),
+                'options' => (array) ($webhook['options'] ?? []),
+                'form_name' => $form_name,
+                'submission_id' => $submission_id,
+                'fields' => $fields,
             ];
 
-            Http::timeout(3)
-                ->asJson()
-                ->post($url, $payload);
+            $adapterClass = (string) ($webhook['adapter'] ?? \App\FormAdapters\DefaultEnvelopeAdapter::class);
+
+            /** @var \App\FormAdapters\Contracts\FormAdapter $adapter */
+            $adapter = app($adapterClass);
+
+            $payload = $adapter->transform($form_name, $submission_id !== '' ? $submission_id : Str::ulid()->toBase32(), $fields, $context);
+
+            $timeout = (int) ($webhook['timeout'] ?? 3);
+            $request = Http::timeout($timeout)->asJson();
+
+            $adapterOpts = (array) $adapter->requestOptions($context);
+            if (!empty($adapterOpts['url'])) {
+                $url = (string) $adapterOpts['url'];
+            }
+            $headers = array_merge((array) ($webhook['headers'] ?? []), (array) ($adapterOpts['headers'] ?? []));
+            if (!empty($headers)) {
+                $request = $request->withHeaders($headers);
+            }
+
+            $method = strtoupper((string) ($webhook['method'] ?? ($adapterOpts['method'] ?? 'POST')));
+
+            // Laravel HTTP client supports send with JSON body
+            $request->send($method, $url, ['json' => $payload]);
         } catch (\Throwable $e) {
             if (is_dev()) {
                 _l('Webhook error', $e->getMessage());
             }
-        }
-    }
-
-    private function flattenFields(array $fields): array
-    {
-        try {
-            return \Illuminate\Support\Arr::dot($fields);
-        } catch (\Throwable $e) {
-            return $fields; // fallback
         }
     }
 }
