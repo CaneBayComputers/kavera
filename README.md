@@ -63,9 +63,22 @@ Quick start (examples shown for the `contact` form in `config/form.php`):
 
 ```php
 'webhooks' => [[
-    'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
     'adapter' => App\FormAdapters\ZapierAdapter::class,
-    // optional: 'options' => ['include_context' => true],
+    'options' => [
+        'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
+        // Map contact form fields to Zapier payload keys
+        'field_map' => [
+            'firstName' => 'first_name',
+            'lastName'  => 'last_name',
+            'company'   => 'company',
+            'email'     => 'email',
+            'phone'     => 'phone',
+            'message'   => 'message',
+        ],
+        // Optional constants
+        'static' => [ 'source' => 'website', 'form' => 'contact' ],
+        // 'include_context' => true,
+    ],
 ]]
 ```
 
@@ -82,6 +95,22 @@ Quick start (examples shown for the `contact` form in `config/form.php`):
         // Optional: add tags after upsert
         // 'tags'       => env('MAILCHIMP_CONTACT_TAGS'), // comma-separated
         // Or set per-form env (comma-separated), e.g. MAILCHIMP_CONTACT_TAGS
+        // Optional: map form fields to Mailchimp merge fields (consistent with Salesforce)
+        // 'field_map' => [
+        //     'FNAME'   => 'first_name',
+        //     'LNAME'   => 'last_name',
+        //     'COMPANY' => 'company',
+        //     'PHONE'   => 'phone',
+        //     // Example address mapping (requires these fields to exist in your form)
+        //     'ADDRESS' => [
+        //         'addr1'   => 'address1',
+        //         'addr2'   => 'address2',
+        //         'city'    => 'city',
+        //         'state'   => 'state',
+        //         'zip'     => 'zip',
+        //         'country' => 'country',
+        //     ],
+        // ],
     ],
 ]]
 

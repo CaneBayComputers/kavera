@@ -3,6 +3,7 @@
 namespace App\FormAdapters;
 
 use App\FormAdapters\Contracts\FormAdapter;
+use Illuminate\Support\Arr;
 
 class MailchimpAdapter implements FormAdapter
 {
@@ -15,18 +16,34 @@ class MailchimpAdapter implements FormAdapter
 
         $email = strtolower(trim((string) ($fields['email'] ?? ($fields['email_address'] ?? ''))));
 
-        // Basic merge fields from common contact form keys
+        // Merge fields mapping (no guessing; requires explicit field_map)
         $mergeFields = [];
-        if (!empty($fields['first_name'])) {
-            $mergeFields['FNAME'] = (string) $fields['first_name'];
-        } elseif (!empty($fields['name'])) { // backward-compat
-            $mergeFields['FNAME'] = (string) $fields['name'];
-        }
-        if (!empty($fields['last_name'])) {
-            $mergeFields['LNAME'] = (string) $fields['last_name'];
-        }
-        if (!empty($fields['company'])) {
-            $mergeFields['COMPANY'] = (string) $fields['company'];
+        $fieldMap = $opts['field_map'] ?? null;
+        if (is_array($fieldMap) && !empty($fieldMap)) {
+            foreach ($fieldMap as $tag => $source) {
+                $tag = strtoupper((string) $tag);
+                if ($tag === '') {
+                    continue;
+                }
+                if (is_array($source)) {
+                    // Address-type merge field
+                    $addr = [];
+                    foreach ($source as $k => $formKey) {
+                        $val = is_string($formKey) ? Arr::get($fields, $formKey) : null;
+                        if ($val !== null && $val !== '') {
+                            $addr[$k] = (string) $val;
+                        }
+                    }
+                    if (!empty($addr)) {
+                        $mergeFields[$tag] = (object) $addr;
+                    }
+                } elseif (is_string($source) && $source !== '') {
+                    $val = Arr::get($fields, $source);
+                    if ($val !== null && $val !== '') {
+                        $mergeFields[$tag] = (string) $val;
+                    }
+                }
+            }
         }
 
         // Optional interest mapping via options: ['interests' => ['abc123' => true]]

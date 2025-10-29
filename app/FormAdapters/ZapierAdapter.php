@@ -3,30 +3,62 @@
 namespace App\FormAdapters;
 
 use App\FormAdapters\Contracts\FormAdapter;
+use Illuminate\Support\Arr;
 
 class ZapierAdapter implements FormAdapter
 {
     public function transform(string $formName, string $submissionId, array $fields, array $context = []): array
     {
-        // Send raw fields; optionally include minimal context
-        $includeContext = (bool) (($context['options']['include_context'] ?? false));
+        $opts = (array) ($context['options'] ?? []);
 
-        if (! $includeContext) {
-            return $fields;
+        // Optional: explicit field mapping for Zapier (dest => source key path)
+        $mapped = [];
+        $map = (array) ($opts['field_map'] ?? []);
+        if (!empty($map)) {
+            foreach ($map as $dest => $src) {
+                if (!is_string($dest) || $dest === '' || !is_string($src) || $src === '') {
+                    continue;
+                }
+                $val = Arr::get($fields, $src);
+                if ($val !== null) {
+                    $mapped[$dest] = $val;
+                }
+            }
         }
 
-        return [
-            'form_id' => $formName,
-            'submission_id' => $submissionId,
-            'fields' => $fields,
-        ];
+        // Base payload is either mapped or raw fields
+        $payload = !empty($mapped) ? $mapped : $fields;
+
+        // Optional: static key/values to merge
+        if (!empty($opts['static']) && is_array($opts['static'])) {
+            foreach ($opts['static'] as $k => $v) {
+                if (is_string($k) && $k !== '') {
+                    $payload[$k] = $v;
+                }
+            }
+        }
+
+        // Optional: include minimal context
+        if (!empty($opts['include_context'])) {
+            $payload['_context'] = [
+                'form_id' => $formName,
+                'submission_id' => $submissionId,
+            ];
+        }
+
+        return $payload;
     }
 
     public function requestOptions(array $context = []): array
     {
-        return [
+        $opts = (array) ($context['options'] ?? []);
+        $out = [
             'method' => 'POST',
-            'headers' => (array) ($context['options']['headers'] ?? []),
+            'headers' => (array) ($opts['headers'] ?? []),
         ];
+        if (!empty($opts['url'])) {
+            $out['url'] = (string) $opts['url'];
+        }
+        return $out;
     }
 }

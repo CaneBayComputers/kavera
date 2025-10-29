@@ -21,17 +21,7 @@ class SalesforceAdapter implements FormAdapter
             return array_key_exists($key, $fields) ? $fields[$key] : $fallback;
         };
 
-        // If no explicit map provided, use a sensible default for common Lead fields
-        if (empty($map)) {
-            $map = [
-                'FirstName'  => 'first_name',
-                'LastName'   => 'last_name',
-                'Company'    => 'company',
-                'Email'      => 'email',
-                'Phone'      => 'phone',
-                'Description' => 'message',
-            ];
-        }
+        // No hard-coded defaults. Expect explicit mapping via options.field_map.
 
         $payload = [];
         foreach ($map as $sfField => $sourceKey) {
@@ -49,12 +39,7 @@ class SalesforceAdapter implements FormAdapter
 
         // Ensure required Lead fields exist with safe fallbacks
         if (!isset($payload['LastName']) || $payload['LastName'] === null || $payload['LastName'] === '') {
-            // Backward-compat: if single 'name' field exists, use it for LastName
-            if (isset($fields['name']) && $fields['name'] !== '') {
-                $payload['LastName'] = (string) $fields['name'];
-            } else {
-                $payload['LastName'] = 'Unknown';
-            }
+            $payload['LastName'] = 'Unknown';
         }
         if (!isset($payload['Company']) || $payload['Company'] === null || $payload['Company'] === '') {
             $payload['Company'] = env('SALESFORCE_DEFAULT_COMPANY', 'Unknown');

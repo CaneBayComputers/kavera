@@ -63,10 +63,29 @@ return [
                     // 'options' => ['flatten' => true],
                 ],
 
-                // Zapier webook integration
+                // Zapier webhook integration (example mapping and static values)
                 // [
-                //     'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
                 //     'adapter' => App\FormAdapters\ZapierAdapter::class,
+                //     'options' => [
+                //         // Endpoint URL for the Zap
+                //         'url' => env('ZAPIER_CONTACT_WEBHOOK_URL', 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/'),
+                //         // Map from contact.rules fields (source) to Zapier payload keys (dest)
+                //         'field_map' => [
+                //             'firstName' => 'first_name',
+                //             'lastName'  => 'last_name',
+                //             'company'   => 'company',
+                //             'email'     => 'email',
+                //             'phone'     => 'phone',
+                //             'message'   => 'message',
+                //         ],
+                //         // Optional: constants to always include
+                //         'static' => [
+                //             'source' => 'website',
+                //             'form'   => 'contact',
+                //         ],
+                //         // Optional: include minimal context
+                //         // 'include_context' => true,
+                //     ],
                 // ],
 
                 // Mailchimp webhook integration (upsert + optional tags)
@@ -77,7 +96,23 @@ return [
                 //         'audience_id' => env('MAILCHIMP_AUDIENCE_ID'),
                 //         'status'      => env('MAILCHIMP_STATUS', 'subscribed'),
                 //         // Optional: add tags after upsert
-                //         // 'tags'       => env('MAILCHIMP_CONTACT_TAGS'), // comma-separated
+                //         // 'tags'        => env('MAILCHIMP_CONTACT_TAGS'), // comma-separated
+                //
+                //         // Explicit field mapping (no guessing). Map from contact.rules fields.
+                //         'field_map' => [
+                //             'FNAME'   => 'first_name',
+                //             'LNAME'   => 'last_name',
+                //             'COMPANY' => 'company',
+                //             'PHONE'   => 'phone',
+                //             'ADDRESS' => [
+                //                 'addr1'   => 'address1',
+                //                 'addr2'   => 'address2',
+                //                 'city'    => 'city',
+                //                 'state'   => 'state',
+                //                 'zip'     => 'zip',
+                //                 'country' => 'country',
+                //             ],
+                //         ],
                 //     ],
                 // ],
 
@@ -90,9 +125,15 @@ return [
                 //         'object'      => env('SALESFORCE_OBJECT', 'Lead'),
                 //         // 'access_token' => env('SALESFORCE_ACCESS_TOKEN'), // or pass headers via webhook
                 //
-                //         // Optional field mapping (Salesforce field => form field key)
-                //         // Defaults map LastName, Company, Email, Phone, Description.
-                //         // 'field_map' => [ 'LastName' => 'name', 'Company' => 'company', 'Email' => 'email' ],
+                //         // Explicit field mapping (Salesforce field => form field key)
+                //         'field_map' => [
+                //             'FirstName'   => 'first_name',
+                //             'LastName'    => 'last_name',
+                //             'Company'     => 'company',
+                //             'Email'       => 'email',
+                //             'Phone'       => 'phone',
+                //             'Description' => 'message',
+                //         ],
                 //
                 //         // Provide default values for required fields if form is missing them
                 //         'defaults' => [

@@ -137,8 +137,20 @@ Examples:
 Zapier
 ```php
 'webhooks' => [[
-  'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
   'adapter' => App\FormAdapters\ZapierAdapter::class,
+  'options' => [
+    'url' => 'https://hooks.zapier.com/hooks/catch/XXXX/YYYY/',
+    'field_map' => [
+      'firstName' => 'first_name',
+      'lastName'  => 'last_name',
+      'company'   => 'company',
+      'email'     => 'email',
+      'phone'     => 'phone',
+      'message'   => 'message',
+    ],
+    'static' => [ 'source' => 'website', 'form' => 'contact' ],
+    // 'include_context' => true,
+  ],
 ]]
 ```
 
@@ -160,7 +172,23 @@ Mailchimp tags (via options on the Mailchimp adapter)
   'options' => [
     'api_key'     => env('MAILCHIMP_API_KEY'),
     'audience_id' => env('MAILCHIMP_AUDIENCE_ID'),
-    'tags'        => ['Web Form', 'Lead'],
+    'tags'        => env('MAILCHIMP_CONTACT_TAGS'),
+    // Optional: merge fields mapping (consistent with Salesforce)
+    // 'field_map' => [
+    //     'FNAME'   => 'first_name',
+    //     'LNAME'   => 'last_name',
+    //     'COMPANY' => 'company',
+    //     'PHONE'   => 'phone',
+    //     // Example address (requires these fields to exist in your form)
+    //     'ADDRESS' => [
+    //         'addr1'   => 'address1',
+    //         'addr2'   => 'address2',
+    //         'city'    => 'city',
+    //         'state'   => 'state',
+    //         'zip'     => 'zip',
+    //         'country' => 'country',
+    //     ],
+    // ],
   ],
 ]]
 ```
