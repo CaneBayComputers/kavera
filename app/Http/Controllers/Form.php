@@ -21,13 +21,34 @@ class Form extends Controller
 {
     public function process(Request $request, Agent $agent, Generator $faker, string $form_name): RedirectResponse
     {
+        if (is_dev()) {
+            _l('process:start', [
+                'form' => $form_name,
+                'path' => $request->path(),
+            ]);
+        }
         $form = _c('form.forms.' . $form_name);
         if (!$form) {
+            if (is_dev()) {
+                _l('process:error:form_not_found', $form_name);
+            }
             abort(404);
+        }
+
+        if (is_dev()) {
+            _l('process:form_loaded', [
+                'has_rules' => isset($form['rules']),
+                'has_mail' => isset($form['mail']) || isset($form['mail_to']),
+                'has_webhooks' => !empty($form['webhooks']) || !empty($form['webhook_url']),
+            ]);
         }
 
         $form_data = $this->validateInput($request, $form['rules']);
         $user_fields = $form_data; // preserve raw user fields for webhook
+
+        if (is_dev()) {
+            _l('process:validated');
+        }
 
         // Dev: generate a non-private/non-reserved fake IP; Prod: real client IP
         if (is_dev()) {
@@ -39,10 +60,23 @@ class Form extends Controller
             $ip_address = $request->ip();
         }
 
+        if (is_dev()) {
+            _l('process:ip_selected', $ip_address);
+        }
+
         // Consolidated bot/abuse checks (UA, links, rate limit, recaptcha)
+        if (is_dev()) {
+            _l('process:pre_bot_check', [
+                'device_type' => $agent->deviceType(),
+                'has_message' => array_key_exists('message', $form_data),
+            ]);
+        }
         $response = $this->looksAutomated($form_data, $agent, $form_name, $ip_address);
 
         if ($response !== null) {
+            if (is_dev()) {
+                _l('process:blocked_by_bot_check', $response);
+            }
             return back()->withErrors([$response])->withInput();
         }
 
@@ -53,7 +87,10 @@ class Form extends Controller
         $submission_id = $this->generateSubmissionId();
 
         if (is_dev()) {
-            _l($form_data);
+            _l('process:meta_enriched', [
+                'device_type' => $form_data['device_type'] ?? null,
+                'ip_kind' => is_array($form_data['ip'] ?? null) ? 'array' : (is_string($form_data['ip'] ?? null) ? 'string' : 'none'),
+            ]);
         }
 
         unset($form_data['token'], $form_data['recaptcha']);
@@ -71,15 +108,34 @@ class Form extends Controller
             if ($view !== '') {
                 $mail_form = new MailForm($form_data, $subject, $view, $type, $textView ?: null);
                 Mail::to($mailTo)->send($mail_form);
+                if (is_dev()) {
+                    _l('process:mail_sent', ['to' => $mailTo, 'view' => $view]);
+                }
+            }
+        } else {
+            if (is_dev()) {
+                _l('process:mail_skipped');
             }
         }
 
         // Fire webhook(s) if configured (prefer 'webhooks' array)
+        if (is_dev()) {
+            _l('process:webhooks_check', [
+                'has_webhooks' => !empty($form['webhooks']) || !empty($form['webhook_url']),
+                'count' => is_countable($form['webhooks'] ?? null) ? count($form['webhooks']) : (!empty($form['webhook_url']) ? 1 : 0),
+            ]);
+        }
         if (!empty($form['webhooks']) && is_array($form['webhooks'])) {
             foreach ((array) $form['webhooks'] as $webhook) {
+                if (is_dev()) {
+                    _l('process:webhook_dispatch', ['adapter' => $webhook['adapter'] ?? null, 'url' => $webhook['url'] ?? null]);
+                }
                 $this->notifyWebhook($form_name, (string) $submission_id, $user_fields, (array) $webhook);
             }
         } elseif (!empty($form['webhook_url'])) { // backward compatibility
+            if (is_dev()) {
+                _l('process:webhook_dispatch', ['url' => (string) $form['webhook_url']]);
+            }
             $this->notifyWebhook($form_name, (string) $submission_id, $user_fields, [
                 'url' => (string) $form['webhook_url'],
             ]);
@@ -243,9 +299,6 @@ class Form extends Controller
     {
         try {
             $url = (string) ($webhook['url'] ?? '');
-            if ($url === '') {
-                return;
-            }
 
             $context = [
                 'app' => config('app.name'),
@@ -272,6 +325,22 @@ class Form extends Controller
             if (!empty($adapterOpts['url'])) {
                 $url = (string) $adapterOpts['url'];
             }
+            if ($url === '') {
+                if (is_dev()) {
+                    $opts = (array) ($context['options'] ?? []);
+                    $email = '';
+                    if (!empty($context['fields']) && is_array($context['fields'])) {
+                        $email = strtolower(trim((string) ($context['fields']['email'] ?? ($context['fields']['email_address'] ?? ''))));
+                    }
+                    _l('Webhook missing URL (adapter did not compute)', [
+                        'adapter' => $adapterClass,
+                        'has_api_key' => isset($opts['api_key']) || env('MAILCHIMP_API_KEY') !== null,
+                        'has_audience' => isset($opts['audience_id']) || env('MAILCHIMP_AUDIENCE_ID') !== null || env('MAILCHIMP_LIST_ID') !== null,
+                        'has_email' => $email !== '',
+                    ]);
+                }
+                return; // no target URL to send to
+            }
             $headers = array_merge((array) ($webhook['headers'] ?? []), (array) ($adapterOpts['headers'] ?? []));
             if (!empty($headers)) {
                 $request = $request->withHeaders($headers);
@@ -280,10 +349,17 @@ class Form extends Controller
             $method = strtoupper((string) ($webhook['method'] ?? ($adapterOpts['method'] ?? 'POST')));
 
             // Laravel HTTP client supports send with JSON body
-            $request->send($method, $url, ['json' => $payload]);
+            $resp = $request->send($method, $url, ['json' => $payload]);
+            if (is_dev() && method_exists($resp, 'successful') && ! $resp->successful()) {
+                _l('Webhook non-2xx', [
+                    'status' => $resp->status(),
+                    'body' => (string) $resp->body(),
+                    'url' => $url,
+                ]);
+            }
 
             // Optional follow-up requests supplied by adapter (e.g., Mailchimp tags)
-            if (!empty($adapterOpts['followups']) && is_array($adapterOpts['followups'])) {
+            if (method_exists($resp, 'successful') && $resp->successful() && !empty($adapterOpts['followups']) && is_array($adapterOpts['followups'])) {
                 foreach ((array) $adapterOpts['followups'] as $follow) {
                     try {
                         $fuMethod = strtoupper((string) ($follow['method'] ?? 'POST'));
@@ -298,7 +374,14 @@ class Form extends Controller
                             $fuReq = $fuReq->withHeaders($fuHeaders);
                         }
                         $fuPayload = (array) ($follow['json'] ?? []);
-                        $fuReq->send($fuMethod, $fuUrl, ['json' => $fuPayload]);
+                        $fuResp = $fuReq->send($fuMethod, $fuUrl, ['json' => $fuPayload]);
+                        if (is_dev() && method_exists($fuResp, 'successful') && ! $fuResp->successful()) {
+                            _l('Webhook follow-up non-2xx', [
+                                'status' => $fuResp->status(),
+                                'body' => (string) $fuResp->body(),
+                                'url' => $fuUrl,
+                            ]);
+                        }
                     } catch (\Throwable $e) {
                         if (is_dev()) {
                             _l('Webhook follow-up error', $e->getMessage());
