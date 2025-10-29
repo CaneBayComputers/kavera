@@ -114,7 +114,8 @@ Form webhooks are adapter‑driven and configurable per form using `webhooks` (a
   - `DefaultEnvelopeAdapter` → current envelope with optional flatten
   - `PassthroughAdapter` → raw fields, optional minimal context
   - `ZapierAdapter` → convenience passthrough (POST)
-  - `MailchimpAdapter` → computes member upsert URL using `dc`, `list_id`, and md5(email); sets Basic Auth header from API key
+  - `MailchimpAdapter` → computes member upsert URL deriving DC from API key suffix, uses Audience ID and md5(email); sets Basic Auth header. If `options.tags` is set or `MAILCHIMP_{FORMNAME}_TAGS` exists (comma-separated), also posts tags.
+  - `SalesforceAdapter` → posts to `/services/data/{version}/sobjects/{object}` with Bearer token; supports field mapping/defaults
 
 ### Configure webhooks
 
@@ -146,12 +147,39 @@ Mailchimp upsert
 'webhooks' => [[
   'adapter' => App\FormAdapters\MailchimpAdapter::class,
   'options' => [
-    'api_key' => env('MAILCHIMP_API_KEY'),
-    'dc' => env('MAILCHIMP_DC'),
-    'list_id' => env('MAILCHIMP_LIST_ID'),
-    'status' => env('MAILCHIMP_STATUS', 'subscribed'),
+    'api_key'     => env('MAILCHIMP_API_KEY'),
+    'audience_id' => env('MAILCHIMP_AUDIENCE_ID'),
+    'status'      => env('MAILCHIMP_STATUS', 'subscribed'),
   ],
 ]]
+
+Mailchimp tags (via options on the Mailchimp adapter)
+```php
+'webhooks' => [[
+  'adapter' => App\FormAdapters\MailchimpAdapter::class,
+  'options' => [
+    'api_key'     => env('MAILCHIMP_API_KEY'),
+    'audience_id' => env('MAILCHIMP_AUDIENCE_ID'),
+    'tags'        => ['Web Form', 'Lead'],
+  ],
+]]
+```
+
+Salesforce create (Lead)
+```php
+'webhooks' => [[
+  'adapter' => App\FormAdapters\SalesforceAdapter::class,
+  'options' => [
+    'base_url'    => env('SALESFORCE_BASE_URL'),
+    'api_version' => env('SALESFORCE_API_VERSION', 'v59.0'),
+    'object'      => env('SALESFORCE_OBJECT', 'Lead'),
+    // 'access_token' => env('SALESFORCE_ACCESS_TOKEN'),
+    // Optional mapping
+    // 'field_map' => [ 'LastName' => 'name', 'Company' => 'company', 'Email' => 'email' ],
+    'defaults'   => [ 'Company' => env('SALESFORCE_DEFAULT_COMPANY', 'Unknown') ],
+  ],
+]]
+```
 ```
 
 ### Adding a new adapter

@@ -51,8 +51,9 @@ Turn‑key add‑ons you can flip on with env keys and Podium commands: Eventbri
 Web form submissions can be forwarded to external services via a flexible adapter system.
 
 - Built‑in adapters:
-  - Mailchimp (list subscribe/upsert)
+  - Mailchimp (list subscribe/upsert, with optional tags)
   - Zapier (catch hook, passthrough fields)
+  - Salesforce (create sObject, e.g., Lead)
 - Per‑form configuration uses `webhooks` (array). Backward compatible with the original `CONTACT_FORM_WEBHOOK_URL`.
 - Supports HTTP method, headers, and adapter options per webhook.
 
@@ -68,23 +69,46 @@ Quick start (examples shown for the `contact` form in `config/form.php`):
 ]]
 ```
 
-2) Mailchimp (upsert)
+2) Mailchimp (upsert + optional tags)
 
 ```php
 'webhooks' => [[
     // Leave url empty to let the adapter compute it from options
     'adapter' => App\FormAdapters\MailchimpAdapter::class,
     'options' => [
-        'api_key'   => env('MAILCHIMP_API_KEY'),
-        'dc'        => env('MAILCHIMP_DC'),      // e.g. us21
-        'list_id'   => env('MAILCHIMP_LIST_ID'),
-        'status'    => env('MAILCHIMP_STATUS', 'subscribed'),
+        'api_key'     => env('MAILCHIMP_API_KEY'),
+        'audience_id' => env('MAILCHIMP_AUDIENCE_ID'),
+        'status'      => env('MAILCHIMP_STATUS', 'subscribed'),
+        // Optional: add tags after upsert
+        // 'tags'       => env('MAILCHIMP_CONTACT_TAGS'), // comma-separated
+        // Or set per-form env (comma-separated), e.g. MAILCHIMP_CONTACT_TAGS
+    ],
+]]
+
+Note: To add tags, pass a simple `tags` array to the Mailchimp options. The adapter will send a follow‑up request to the tags endpoint automatically with `status: active`.
+
+3) Salesforce (sObject create)
+
+```php
+'webhooks' => [[
+    // Let adapter compute from base URL, API version, and object
+    'adapter' => App\FormAdapters\SalesforceAdapter::class,
+    'options' => [
+        'base_url'    => env('SALESFORCE_BASE_URL'),            // e.g. https://myinstance.my.salesforce.com
+        'api_version' => env('SALESFORCE_API_VERSION', 'v59.0'),
+        'object'      => env('SALESFORCE_OBJECT', 'Lead'),
+        // 'access_token' => env('SALESFORCE_ACCESS_TOKEN'),    // or pass headers via webhook
+        // Optional mapping (Salesforce field => form key); defaults map LastName, Company, Email, Phone, Description
+        // 'field_map' => [ 'LastName' => 'name', 'Company' => 'company', 'Email' => 'email' ],
+        'defaults' => [ 'Company' => env('SALESFORCE_DEFAULT_COMPANY', 'Unknown') ],
     ],
 ]]
 ```
+```
 
 Notes
-- The Mailchimp adapter computes the member upsert URL using `dc`, `list_id`, and the submitted `email` (md5 hash). It sends Authorization: Basic with your API key. `status` can be set via `MAILCHIMP_STATUS`.
+- The Mailchimp adapter computes the member upsert URL by deriving the data center from your API key suffix (e.g., `abcd-us21` → `us21`), plus Audience ID and the submitted `email` (md5 hash). It sends Authorization: Basic with your API key. `status` can be set via `MAILCHIMP_STATUS`.
+- Tags: you can set `'tags' => env('MAILCHIMP_CONTACT_TAGS')` (comma-separated), or pass a `tags` array in config.
 - Prefer `webhooks: [ ... ]` for multiple destinations; each can use a different adapter and headers.
 
 ### 🧰 Content Page Prompt Creator (Agent Brief Wizard)

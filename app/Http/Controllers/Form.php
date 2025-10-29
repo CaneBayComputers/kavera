@@ -59,9 +59,19 @@ class Form extends Controller
         unset($form_data['token'], $form_data['recaptcha']);
         unset($user_fields['token'], $user_fields['_token'], $user_fields['recaptcha'], $user_fields['g-recaptcha-response']);
 
-        if (!empty($form['mail_to'])) {
-            $mail_form = new MailForm($form_data, $form['subject'], $form['view'], $form['type'], $form['text_view'] ?? null);
-            Mail::to($form['mail_to'])->send($mail_form);
+        // Mail dispatch (grouped config under 'mail', with backward compatibility)
+        $mailCfg = (array) ($form['mail'] ?? []);
+        $mailTo = (string) ($mailCfg['to'] ?? ($form['mail_to'] ?? ''));
+        if ($mailTo !== '') {
+            $subject = (string) ($mailCfg['subject'] ?? ($form['subject'] ?? (config('app.name') . ' Form Submission')));
+            $view = (string) ($mailCfg['view'] ?? ($form['view'] ?? ''));
+            $type = (string) ($mailCfg['type'] ?? ($form['type'] ?? 'view'));
+            $textView = $mailCfg['text_view'] ?? ($form['text_view'] ?? null);
+
+            if ($view !== '') {
+                $mail_form = new MailForm($form_data, $subject, $view, $type, $textView ?: null);
+                Mail::to($mailTo)->send($mail_form);
+            }
         }
 
         // Fire webhook(s) if configured (prefer 'webhooks' array)
@@ -271,6 +281,31 @@ class Form extends Controller
 
             // Laravel HTTP client supports send with JSON body
             $request->send($method, $url, ['json' => $payload]);
+
+            // Optional follow-up requests supplied by adapter (e.g., Mailchimp tags)
+            if (!empty($adapterOpts['followups']) && is_array($adapterOpts['followups'])) {
+                foreach ((array) $adapterOpts['followups'] as $follow) {
+                    try {
+                        $fuMethod = strtoupper((string) ($follow['method'] ?? 'POST'));
+                        $fuUrl = (string) ($follow['url'] ?? '');
+                        if ($fuUrl === '') {
+                            continue;
+                        }
+
+                        $fuHeaders = array_merge($headers, (array) ($follow['headers'] ?? []));
+                        $fuReq = Http::timeout($timeout)->asJson();
+                        if (!empty($fuHeaders)) {
+                            $fuReq = $fuReq->withHeaders($fuHeaders);
+                        }
+                        $fuPayload = (array) ($follow['json'] ?? []);
+                        $fuReq->send($fuMethod, $fuUrl, ['json' => $fuPayload]);
+                    } catch (\Throwable $e) {
+                        if (is_dev()) {
+                            _l('Webhook follow-up error', $e->getMessage());
+                        }
+                    }
+                }
+            }
         } catch (\Throwable $e) {
             if (is_dev()) {
                 _l('Webhook error', $e->getMessage());

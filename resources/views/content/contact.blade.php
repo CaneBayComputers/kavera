@@ -23,8 +23,12 @@
             <form action="/forms/contact" id="contact-form" method="post">
                 @csrf
                 <div class="mb-3">
-                    <label for="fullName" class="form-label">Full Name</label>
-                    <input type="text" maxlength="100" name="name" class="form-control" id="fullName" placeholder="Enter your full name" value="{{ old('name') }}" required>
+                    <label for="firstName" class="form-label">First Name</label>
+                    <input type="text" maxlength="100" name="first_name" class="form-control" id="firstName" placeholder="Enter your first name" value="{{ old('first_name') }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="lastName" class="form-label">Last Name</label>
+                    <input type="text" maxlength="100" name="last_name" class="form-control" id="lastName" placeholder="Enter your last name" value="{{ old('last_name') }}">
                 </div>
                 <div class="mb-3">
                     <label for="email" class="form-label">Email Address</label>

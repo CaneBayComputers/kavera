@@ -17,8 +17,13 @@ class MailchimpAdapter implements FormAdapter
 
         // Basic merge fields from common contact form keys
         $mergeFields = [];
-        if (!empty($fields['name'])) {
+        if (!empty($fields['first_name'])) {
+            $mergeFields['FNAME'] = (string) $fields['first_name'];
+        } elseif (!empty($fields['name'])) { // backward-compat
             $mergeFields['FNAME'] = (string) $fields['name'];
+        }
+        if (!empty($fields['last_name'])) {
+            $mergeFields['LNAME'] = (string) $fields['last_name'];
         }
         if (!empty($fields['company'])) {
             $mergeFields['COMPANY'] = (string) $fields['company'];
@@ -45,9 +50,14 @@ class MailchimpAdapter implements FormAdapter
     {
         $opts = (array) ($context['options'] ?? []);
 
-        $apiKey     = (string) ($opts['api_key'] ?? env('MAILCHIMP_API_KEY', ''));
-        $dataCenter = (string) ($opts['dc'] ?? $opts['data_center'] ?? env('MAILCHIMP_DC', ''));
-        $listId = (string) ($opts['list_id'] ?? env('MAILCHIMP_LIST_ID', ''));
+        $apiKey = (string) ($opts['api_key'] ?? env('MAILCHIMP_API_KEY', ''));
+        $listId = (string) (
+            $opts['audience_id']
+                ?? $opts['list_id']
+                ?? env('MAILCHIMP_AUDIENCE_ID')
+                ?? env('MAILCHIMP_LIST_ID')
+                ?? ''
+        );
 
         $headers = [];
         if ($apiKey !== '') {
@@ -58,6 +68,13 @@ class MailchimpAdapter implements FormAdapter
 
         // If URL not supplied in webhook, compute a member upsert endpoint when possible
         $url = null;
+        // Derive data center from API key suffix (e.g., abcd-us21 => us21)
+        $dataCenter = '';
+        if ($apiKey !== '' && str_contains($apiKey, '-')) {
+            $parts = explode('-', $apiKey);
+            $dataCenter = strtolower(end($parts));
+        }
+
         if (!empty($dataCenter) && !empty($listId)) {
             $email = '';
             if (!empty($context['fields']) && is_array($context['fields'])) {
@@ -77,6 +94,46 @@ class MailchimpAdapter implements FormAdapter
 
         if ($url) {
             $out['url'] = $url;
+        }
+
+        // Optional follow-up: add tags if provided (array) or via env per form
+        $tags = $opts['tags'] ?? [];
+        if ((empty($tags) || !is_array($tags)) && !empty($context['form_name'])) {
+            $formKey = strtoupper(preg_replace('~[^A-Za-z0-9]+~', '_', (string) $context['form_name']));
+            $envKey = 'MAILCHIMP_' . $formKey . '_TAGS';
+            $envVal = env($envKey, '');
+            if (is_string($envVal) && $envVal !== '') {
+                $tags = array_values(array_filter(array_map(static function ($s) {
+                    return trim((string) $s);
+                }, explode(',', $envVal)), static function ($s) {
+                    return $s !== '';
+                }));
+            }
+        }
+        if (!empty($tags) && is_array($tags) && $dataCenter !== '' && $listId !== '') {
+            $email = '';
+            if (!empty($context['fields']) && is_array($context['fields'])) {
+                $email = strtolower(trim((string) ($context['fields']['email'] ?? ($context['fields']['email_address'] ?? ''))));
+            }
+            if ($email !== '') {
+                $subscriberHash = md5($email);
+                $tagsUrl = sprintf('https://%s.api.mailchimp.com/3.0/lists/%s/members/%s/tags', $dataCenter, $listId, $subscriberHash);
+                $tagsArray = [];
+                foreach ((array) $tags as $t) {
+                    $name = (string) $t;
+                    if ($name !== '') {
+                        $tagsArray[] = ['name' => $name, 'status' => 'active'];
+                    }
+                }
+                if (!empty($tagsArray)) {
+                    $out['followups'][] = [
+                        'method' => 'POST',
+                        'url' => $tagsUrl,
+                        'headers' => $headers,
+                        'json' => ['tags' => $tagsArray],
+                    ];
+                }
+            }
         }
 
         return $out;
