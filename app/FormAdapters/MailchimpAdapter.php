@@ -14,7 +14,17 @@ class MailchimpAdapter implements FormAdapter
         $opts   = (array) ($context['options'] ?? []);
         $status = (string) ($opts['status'] ?? env('MAILCHIMP_STATUS', 'subscribed'));
 
-        $email = strtolower(trim((string) ($fields['email'] ?? ($fields['email_address'] ?? ''))));
+        // Resolve email strictly via field_map['EMAIL'] when provided
+        $email = '';
+        if (isset($opts['field_map']) && is_array($opts['field_map'])) {
+            $emailSrc = $opts['field_map']['EMAIL'] ?? null;
+            if (is_string($emailSrc) && $emailSrc !== '') {
+                $emailVal = Arr::get($fields, $emailSrc);
+                if ($emailVal !== null && $emailVal !== '') {
+                    $email = strtolower(trim((string) $emailVal));
+                }
+            }
+        }
 
         // Merge fields mapping (no guessing; requires explicit field_map)
         $mergeFields = [];
@@ -22,6 +32,10 @@ class MailchimpAdapter implements FormAdapter
         if (is_array($fieldMap) && !empty($fieldMap)) {
             foreach ($fieldMap as $tag => $source) {
                 $tag = strtoupper((string) $tag);
+                if ($tag === 'EMAIL') {
+                    // EMAIL is handled separately for API payload address and URL computation
+                    continue;
+                }
                 if ($tag === '') {
                     continue;
                 }
@@ -94,8 +108,13 @@ class MailchimpAdapter implements FormAdapter
 
         if (!empty($dataCenter) && !empty($listId)) {
             $email = '';
-            if (!empty($context['fields']) && is_array($context['fields'])) {
-                $email = strtolower(trim((string) ($context['fields']['email'] ?? ($context['fields']['email_address'] ?? ''))));
+            // Resolve email using field_map['EMAIL'] strictly
+            $map = (array) ($opts['field_map'] ?? []);
+            if (!empty($map['EMAIL']) && is_string($map['EMAIL'])) {
+                $emailVal = Arr::get((array) ($context['fields'] ?? []), $map['EMAIL']);
+                if ($emailVal !== null && $emailVal !== '') {
+                    $email = strtolower(trim((string) $emailVal));
+                }
             }
             if ($email !== '') {
                 $subscriberHash = md5($email);

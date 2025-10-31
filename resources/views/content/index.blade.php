@@ -2,13 +2,14 @@
 
 @section('content')
 
-<!-- Hero: Flat‑File, Laravel‑Powered -->
+<!-- Hero: Sitekit on Laravel -->
 <section class="py-5 text-white" style="background: linear-gradient(90deg, #0d6efd, #f97316);">
   <div class="container py-4">
     <div class="row align-items-center g-4">
       <div class="col-lg-7">
-        <h1 class="display-5 fw-bold mb-3">Sitekit on Laravel: Fast Pages. Easy AI Agent Changes.</h1>
-        <p class="lead mb-4">Flat‑file speed with full‑stack power—so <strong>AI agents can edit pages directly</strong>, without wrestling a database like WordPress. Pages are Blade, content is pre‑validated in Redis, and forms ship with email + webhooks. Add events, galleries, blog posts, and stock images—<strong>no plugin drama</strong>.</p>
+        <h1 class="display-5 fw-bold mb-3">Sitekit on Laravel: Build Websites at Agent Speed</h1>
+        <p class="lead mb-3">A clean Laravel starter so <strong>AI agents can assemble real sites fast</strong> — pages are simple Blade files, routing is pre‑validated for safety, and forms ship with email + webhooks. Add events, galleries, posts, and stock images — <strong>no plugin drama</strong>.</p>
+        <p class="mb-4 small">Bonus: sensible SEO defaults — pages set proper title tags, and the Agent Brief suggests keywords you can pepper through copy and headings.</p>
         <a href="/features" class="btn btn-light btn-lg me-2">See Features</a>
         <a href="/#footer" class="btn btn-outline-light btn-lg">Get Updates</a>
       </div>
@@ -40,7 +41,7 @@
       <div class="col-md-6 col-lg-3">
         <div class="h-100 p-3 border bg-white">
           <div class="d-flex align-items-center mb-2"><i class="bi bi-calendar-event me-2 text-primary"></i><strong>Eventbrite Events</strong></div>
-          <p class="small mb-0">Fetch and cache organization events and render on `/events`. Easy to wire; keys live in `.env`.</p>
+          <p class="small mb-0">Fetch and cache organization events and render on any page.</p>
         </div>
       </div>
       <div class="col-md-6 col-lg-3">
@@ -62,10 +63,37 @@
         </div>
       </div>
     </div>
+    <!-- Forms + Integrations Row -->
+    <div class="row g-4 mt-1">
+      <div class="col-md-6 col-lg-3">
+        <div class="h-100 p-3 border bg-white">
+          <div class="d-flex align-items-center mb-2"><i class="bi bi-envelope-paper me-2 text-primary"></i><strong>Form Emailing</strong></div>
+          <p class="small mb-0">Process form submissions and email details using clean HTML templates. Mailhog in dev.</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="h-100 p-3 border bg-white">
+          <div class="d-flex align-items-center mb-2"><i class="bi bi-cloud-upload me-2 text-primary"></i><strong>Salesforce</strong></div>
+          <p class="small mb-0">Create Leads (or any sObject) via a simple field map. No plugin roulette.</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="h-100 p-3 border bg-white">
+          <div class="d-flex align-items-center mb-2"><i class="bi bi-person-plus me-2 text-primary"></i><strong>Mailchimp</strong></div>
+          <p class="small mb-0">Subscribe/upsert with explicit field mapping and optional tags. Audience‑first, no guessing.</p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="h-100 p-3 border bg-white">
+          <div class="d-flex align-items-center mb-2"><i class="bi bi-diagram-3 me-2 text-primary"></i><strong>Zapier</strong></div>
+          <p class="small mb-0">Send mapped payloads to Zaps and fan out to thousands of apps with one hook.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- Why Flat‑File Beats WordPress -->
+<!-- Why This Beats WordPress for small sites -->
 <section class="py-5">
   <div class="container">
     <div class="row align-items-center g-5">
@@ -74,17 +102,17 @@
         <p class="mb-3">WordPress is a great blog engine—but for small marketing sites it’s often <strong>overkill</strong>: database setup, plugin roulette, security patches, and random theme quirks.</p>
         <ul class="list-unstyled small">
           <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>No DB.</strong> Pages are Blade files in <code>resources/views/content</code>.</li>
-          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Fast routing.</strong> Allowed pages pre‑validated and cached in Redis.</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Fast routing.</strong> Allowed pages are pre‑validated and cached.</li>
           <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Forms included.</strong> Email + optional webhooks (Mailhog in dev).</li>
           <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Zero plugin drama.</strong> All code lives in your repo.</li>
         </ul>
       </div>
       <div class="col-lg-6">
         <div class="p-4 border bg-white">
-          <h5 class="mb-2">Flat‑File Request Flow</h5>
+          <h5 class="mb-2">Request Flow</h5>
           <ol class="small mb-0">
             <li>Request <code>/about</code> → <code>content/about.blade.php</code></li>
-            <li>Middleware checks Redis list; invalid slugs 404 instantly</li>
+            <li>Middleware checks a pre‑built page list; invalid slugs 404 instantly</li>
             <li>Blade renders with your header/footer template</li>
           </ol>
         </div>

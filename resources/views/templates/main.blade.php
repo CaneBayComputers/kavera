@@ -93,6 +93,9 @@
                                 <li><a class="dropdown-item" href="/features-pixabay">Pixabay Images</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/features-forms">Forms &amp; Webhooks</a></li>
+                                <li><a class="dropdown-item" href="/features-mailchimp">Mailchimp</a></li>
+                                <li><a class="dropdown-item" href="/features-zapier">Zapier</a></li>
+                                <li><a class="dropdown-item" href="/features-salesforce">Salesforce</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">

@@ -175,6 +175,7 @@ Mailchimp tags (via options on the Mailchimp adapter)
     'tags'        => env('MAILCHIMP_CONTACT_TAGS'),
     // Optional: merge fields mapping (consistent with Salesforce)
     // 'field_map' => [
+    //     'EMAIL'   => 'email',
     //     'FNAME'   => 'first_name',
     //     'LNAME'   => 'last_name',
     //     'COMPANY' => 'company',
@@ -208,7 +209,7 @@ Salesforce create (Lead)
   ],
 ]]
 ```
-```
+
 
 ### Adding a new adapter
 

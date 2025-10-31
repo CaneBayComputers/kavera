@@ -100,6 +100,7 @@ return [
                 //
                 //         // Explicit field mapping (no guessing). Map from contact.rules fields.
                 //         'field_map' => [
+                //             'EMAIL'   => 'email',
                 //             'FNAME'   => 'first_name',
                 //             'LNAME'   => 'last_name',
                 //             'COMPANY' => 'company',
