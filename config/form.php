@@ -55,13 +55,13 @@ return [
             // Optional webhook(s) to receive form submissions
             // Backward compatible: if only CONTACT_FORM_WEBHOOK_URL is set, it will be used automatically.
             'webhooks' => [
-                [
-                    'url' => env('CONTACT_FORM_WEBHOOK_URL'),
-                    'adapter' => App\FormAdapters\DefaultEnvelopeAdapter::class,
-                    // 'method' => 'POST',
-                    // 'headers' => ['Authorization' => 'Bearer ...'],
-                    // 'options' => ['flatten' => true],
-                ],
+                // [
+                //     'url' => env('CONTACT_FORM_WEBHOOK_URL'),
+                //     'adapter' => App\FormAdapters\DefaultEnvelopeAdapter::class,
+                //     // 'method' => 'POST',
+                //     // 'headers' => ['Authorization' => 'Bearer ...'],
+                //     // 'options' => ['flatten' => true],
+                // ],
 
                 // Zapier webhook integration (example mapping and static values)
                 // [
@@ -97,7 +97,7 @@ return [
                 //         'status'      => env('MAILCHIMP_STATUS', 'subscribed'),
                 //         // Optional: add tags after upsert
                 //         // 'tags'        => env('MAILCHIMP_CONTACT_TAGS'), // comma-separated
-                //
+
                 //         // Explicit field mapping (no guessing). Map from contact.rules fields.
                 //         'field_map' => [
                 //             'EMAIL'   => 'email',
@@ -105,14 +105,14 @@ return [
                 //             'LNAME'   => 'last_name',
                 //             'COMPANY' => 'company',
                 //             'PHONE'   => 'phone',
-                //             'ADDRESS' => [
-                //                 'addr1'   => 'address1',
-                //                 'addr2'   => 'address2',
-                //                 'city'    => 'city',
-                //                 'state'   => 'state',
-                //                 'zip'     => 'zip',
-                //                 'country' => 'country',
-                //             ],
+                //             // 'ADDRESS' => [
+                //             //     'addr1'   => 'address1',
+                //             //     'addr2'   => 'address2',
+                //             //     'city'    => 'city',
+                //             //     'state'   => 'state',
+                //             //     'zip'     => 'zip',
+                //             //     'country' => 'country',
+                //             // ],
                 //         ],
                 //     ],
                 // ],
