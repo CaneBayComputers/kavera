@@ -50,32 +50,15 @@
           .footer-gradient h5, .footer-gradient a, .footer-gradient p, .footer-gradient li { color:#0b1220; }
           .footer-gradient a:hover { color: var(--brand-primary); }
         </style>
+        @yield('jsonld')
     </head>
     <body>
 
         <!-- Navigation Bar -->
         <nav class="navbar navbar-expand-lg navbar-dark header-gradient shadow-sm position-relative">
             <div class="container">
-                <a class="navbar-brand d-flex align-items-center gap-2" href="/" aria-label="Home" style="line-height:1;">
-                    <svg width="260" height="54" viewBox="0 0 360 90" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sitekit on Laravel" style="display:block;">
-                      <defs>
-                        <linearGradient id="lg" x1="0" x2="1" y1="0" y2="1">
-                          <stop offset="0%" stop-color="#0d6efd"/>
-                          <stop offset="100%" stop-color="#f97316"/>
-                        </linearGradient>
-                      </defs>
-                      <!-- Abstract badge -->
-                      <rect x="6" y="10" rx="12" ry="12" width="100" height="40" fill="url(#lg)" opacity="0.92"/>
-                      <g opacity="0.95">
-                        <circle cx="30" cy="32" r="8" fill="#fff"/>
-                        <rect x="50" y="24" width="42" height="9" rx="5" fill="#fff"/>
-                        <rect x="50" y="38" width="34" height="7" rx="4" fill="#ffedd5"/>
-                      </g>
-                      <!-- Wordmark -->
-                      <text x="116" y="36" font-family="'Segoe UI', Tahoma, Arial, sans-serif" font-weight="900" font-size="30" fill="#ffffff" letter-spacing=".5">Sitekit</text>
-                      <text x="116" y="56" font-family="'Segoe UI', Tahoma, Arial, sans-serif" font-weight="700" font-size="16" fill="#ffedd5" letter-spacing=".4">on Laravel</text>
-                    </svg>
-                    <span class="visually-hidden">Sitekit on Laravel</span>
+                <a class="navbar-brand d-flex align-items-center gap-2" href="/" aria-label="Home" style="line-height:1; font-weight:900; font-size:1.5rem; color:#fff;">
+                    Kavera
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -119,7 +102,7 @@
         <div class="text-white py-5 text-center" style="background: linear-gradient(90deg, var(--brand-primary), #22d3ee);">
             <div class="container">
                 <h2 class="mb-2">Ready to get started?</h2>
-                <p class="mb-3">Use <a class="text-white text-decoration-underline" href="https://github.com/CaneBayComputers/podium-cli" target="_blank" rel="noopener">Podium&nbsp;CLI</a> to clone Sitekit, then run the Agent Brief wizard to generate a complete build prompt.</p>
+                <p class="mb-3">Use <a class="text-white text-decoration-underline" href="https://github.com/CaneBayComputers/podium-cli" target="_blank" rel="noopener">Podium&nbsp;CLI</a> to clone Kavera, then run the Agent Brief wizard to generate a complete build prompt.</p>
                 <div class="d-inline-block text-start bg-dark bg-opacity-10 border border-light-subtle rounded px-3 py-2 small mb-3">
 <pre class="m-0"><code>podium clone https://github.com/CaneBayComputers/laravel-flat-file-website.git
 cd laravel-flat-file-website

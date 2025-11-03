@@ -1,0 +1,68 @@
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://kavera.dev/#website",
+      "name": "Kavera",
+      "url": "https://kavera.dev/",
+      "inLanguage": "en",
+      "description": "Kavera is an agent‑first Laravel website framework that combines flat‑file pages with service integrations. Build real sites fast with forms (email + webhooks), events, galleries, stock images, safe routing, and SEO‑ready defaults.",
+      "publisher": { "@id": "https://kavera.dev/#organization" },
+      "isAccessibleForFree": true,
+      "potentialAction": {
+        "@type": "ReadAction",
+        "target": ["https://kavera.dev/"]
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://kavera.dev/#organization",
+      "name": "Kavera",
+      "url": "https://kavera.dev/",
+      "sameAs": ["https://github.com/CaneBayComputers/kavera"],
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://kavera.dev/images/logo.png"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://kavera.dev/#software",
+      "name": "Kavera",
+      "url": "https://kavera.dev/",
+      "applicationCategory": "DeveloperTool",
+      "operatingSystem": "Any",
+      "softwareRequirements": "PHP 8.3, Laravel 12; MariaDB & Redis (dev defaults), Mailhog (dev)",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Flat‑file content pages (Blade)",
+        "Built‑in form processing with email",
+        "Webhook adapters: Mailchimp, Zapier, Salesforce",
+        "Events, galleries, and stock image helpers",
+        "Safe, pre‑validated routing",
+        "SEO‑ready defaults"
+      ],
+      "publisher": { "@id": "https://kavera.dev/#organization" }
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://github.com/CaneBayComputers/kavera#source",
+      "name": "Kavera",
+      "codeRepository": "https://github.com/CaneBayComputers/kavera",
+      "url": "https://kavera.dev/",
+      "programmingLanguage": ["PHP", "Blade"],
+      "runtimePlatform": "Laravel 12",
+      "license": "https://opensource.org/licenses/MIT",
+      "keywords": "laravel, flat-file, blade, forms, webhooks, mailchimp, zapier, salesforce, redis, eventbrite, flickr, seo, php, agent",
+      "isPartOf": { "@id": "https://kavera.dev/#website" }
+    }
+  ]
+}
+</script>

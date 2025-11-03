@@ -1,6 +1,20 @@
-# 🚀 Sitekit on Laravel — Build Websites at Agent Speed
+# 🚀 Kavera on Laravel — Build Websites at Agent Speed
 
-Sitekit on Laravel lets you and your AI agent build a real website in minutes, not weeks. No plugins. No theme roulette. Just a clean Laravel app with pages as Blade files, a first‑class forms system, and ready‑to‑flip integrations. Point an agent at it and watch a site come together fast: hero banners, feature grids, galleries, events, and contact flows — all in one go.
+Kavera is a Laravel-native website framework that combines flat-file content with
+service-driven dynamic data. Pages are simple Blade templates you can edit by
+hand or generate with an AI agent, and connected services like Blogger,
+Eventbrite, Flickr, and form webhooks feed structured content into Redis for
+fast, predictable rendering.
+
+This allows a complete site to be created in minutes, not weeks: static content
+is easy to modify, dynamic content comes from the tools users already know, and
+forms include spam controls, validation, email handling, persistence, and
+webhook integrations. Kavera includes an Agent Briefing Wizard to generate an
+accurate build brief for AI assistants, but using an agent is optional — the
+system works just as well with manual workflows.
+
+The result is a website framework that stays simple at its core, scales through
+services, and lets developers ship real business sites quickly and reliably.
 
 Why teams like it:
 - 🧰 Turn‑key: clone and run with Podium CLI (or locally with PHP 8.3). No extra scaffolding.
@@ -65,7 +79,7 @@ Setup and code examples live in AGENTS.md → “Webhook Adapters.”
 
 ## 🧭 Agent Brief Wizard
 
-Run an interactive command to generate a project‑specific prompt that tells any AI agent exactly how to build out your site within Sitekit on Laravel.
+Run an interactive command to generate a project‑specific prompt that tells any AI agent exactly how to build out your site within Kavera on Laravel.
 
 ```bash
 podium art app:agent-brief

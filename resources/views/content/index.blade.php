@@ -2,12 +2,12 @@
 
 @section('content')
 
-<!-- Hero: Sitekit on Laravel -->
+<!-- Hero: Kavera on Laravel -->
 <section class="py-5 text-white" style="background: linear-gradient(90deg, #0d6efd, #f97316);">
   <div class="container py-4">
     <div class="row align-items-center g-4">
       <div class="col-lg-7">
-        <h1 class="display-5 fw-bold mb-3">Sitekit on Laravel: Build Websites at Agent Speed</h1>
+        <h1 class="display-5 fw-bold mb-3">Kavera on Laravel: Build Websites at Agent Speed</h1>
         <p class="lead mb-3">A clean Laravel starter so <strong>AI agents can assemble real sites fast</strong> — pages are simple Blade files, routing is pre‑validated for safety, and forms ship with email + webhooks. Add events, galleries, posts, and stock images — <strong>no plugin drama</strong>.</p>
         <p class="mb-4 small">Bonus: sensible SEO defaults — pages set proper title tags, and the Agent Brief suggests keywords you can pepper through copy and headings.</p>
         <a href="/features" class="btn btn-light btn-lg me-2">See Features</a>
@@ -148,9 +148,9 @@
             <div class="p-3 border bg-white h-100">
               <h6 class="mb-1">Podium‑Ready</h6>
               <p class="mb-2">Run everything in containers with <a class="text-decoration-underline" href="https://github.com/CaneBayComputers/podium-cli" target="_blank" rel="noopener">Podium CLI</a>.</p>
-              <pre class="small bg-light p-2 mb-0"><code>podium clone https://github.com/CaneBayComputers/laravel-flat-file-website.git
+              <pre class="small bg-light p-2 mb-0"><code>podium clone https://github.com/CaneBayComputers/kavera.git
 podium art app:agent-brief</code></pre>
-              <p class="small mb-0">Clone Sitekit, run the Agent Brief wizard, and start customizing immediately.</p>
+              <p class="small mb-0">Clone Kavera, run the Agent Brief wizard, and start customizing immediately.</p>
             </div>
           </div>
           <div class="col-md-6">
@@ -165,4 +165,9 @@ podium art app:agent-brief</code></pre>
   </div>
 </section>
 
+@endsection
+
+
+@section('jsonld')
+{!! file_get_contents(resource_path('views/jsonld/index.jsonld')) !!}
 @endsection
