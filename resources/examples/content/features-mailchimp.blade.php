@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Mailchimp Integration';
+    $pageDescription = 'Subscribe or upsert contacts to your Mailchimp audience via webhook with explicit field mapping and optional tags.';
+@endphp
+
 @section('content')
 <section class="py-5">
   <div class="container">
@@ -34,4 +39,3 @@
   </div>
   </section>
 @endsection
-

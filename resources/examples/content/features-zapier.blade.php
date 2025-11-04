@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Zapier Integration';
+    $pageDescription = 'Send mapped form data to Zapier and fan out to connected apps using a single, simple webhook.';
+@endphp
+
 @section('content')
 <section class="py-5">
   <div class="container">
@@ -34,4 +39,3 @@
   </div>
 </section>
 @endsection
-

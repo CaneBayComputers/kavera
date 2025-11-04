@@ -1,4 +1,10 @@
 @extends('templates.main')
+
+@php
+    $pageTitle = 'Forms & Webhooks';
+    $pageDescription = 'Config-driven forms with validation, email templates, and optional webhook integrations for external services.';
+@endphp
+
 @section('content')
 <section class="py-5"><div class="container">
   <h1 class="mb-3">Forms &amp; Webhooks</h1>
@@ -11,4 +17,3 @@
   </ul>
 </div></section>
 @endsection
-

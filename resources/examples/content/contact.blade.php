@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Contact Us';
+    $pageDescription = 'Get in touch for support, sales, or general questions using our simple contact form.';
+@endphp
+
 @section('content')
 
 <!-- Contact Form Section -->

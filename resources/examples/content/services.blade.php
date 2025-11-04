@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Services';
+    $pageDescription = 'Explore our services with a gallery driven by a cached Pixabay search — fast, static, and easy to edit.';
+@endphp
+
 @section('content')
 
 <!-- Services Page Content -->

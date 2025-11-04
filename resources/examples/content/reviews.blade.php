@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Customer Reviews';
+    $pageDescription = 'See what customers are saying — testimonials and ratings that highlight service quality and experience.';
+@endphp
+
 @section('content')
 
 <!-- Services Page Content -->

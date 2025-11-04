@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Features Showcase';
+    $pageDescription = 'A playful showcase of UI effects and placeholder image providers, including carousels, cards, and fun styling.';
+@endphp
+
 @section('content')
 
 <style>

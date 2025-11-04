@@ -87,12 +87,6 @@ utility classes rather than inline styling.
 * Refresh Redis content list:
 
   ```bash
-  php artisan app:update-content-list
-  ```
-
-  or
-
-  ```bash
   podium art app:update-content-list
   ```
 
@@ -126,12 +120,13 @@ Agents can bootstrap pages from images dropped into `public/images` using lightw
   - Role heuristics: hero/banner (very wide), card/feature (rectangular), headshot/logo (square), gallery (default).
 
 - Preferred: sidecar manifest
-  - Create `resources/content/<page>.yaml` describing sections, order, alt text, and captions. The Blade template should read this file and render with Bootstrap components.
-  - If no manifest is present, parse filenames and image aspect ratio to build a first‑pass layout.
+  - Create `storage/app/images-manifest.yaml` describing sections, order, alt text, captions, and placement hints.
+  - The manifest is intended for the AI agent to read during generation; Blade templates do not read it at runtime.
+  - If no manifest is present, the agent can parse filenames and image aspect ratios to build a first‑pass layout.
 
 - Suggested workflow
   1) Scan `public/images` and build a manifest grouped by page slug.
-  2) Generate `resources/views/content/<page>.blade.php` with sections: hero, features/cards grid, gallery, and optional team/logos.
+  2) Agent generates `resources/views/content/<page>.blade.php` with sections: hero, features/cards grid, gallery, and optional team/logos, embedding chosen images and alt text.
   3) Use helpers for assets (`images('...')`) so S3 vs local switching works.
   4) Refresh routes: `podium art app:update-content-list`.
 
@@ -181,19 +176,42 @@ This project ships with a JSON‑LD validation command and a simple convention f
 - Validate a single file:
 
 ```bash
-php artisan schema:validate-jsonld --file=<slug>.jsonld
+podium art schema:validate-jsonld --file=<slug>.jsonld
 ```
 
 - Or validate all JSON‑LD files:
 
 ```bash
-php artisan schema:validate-jsonld
+podium art schema:validate-jsonld
 ```
 
 The validator checks:
 - Presence of the `<script type="application/ld+json">` wrapper
 - Valid JSON and JSON‑LD expansion (via `ml/json-ld`)
 - Detects schema.org items (via `brick/structured-data`); warns if none found
+
+---
+
+### SEO Meta Tags (Per‑Page)
+
+When creating or modifying content pages under `resources/views/content`, set SEO variables at the very top of the file so the main layout can render proper head tags. Use a short `@php` block:
+
+```
+@php
+    $pageTitle = 'Page Title Here';
+    $pageDescription = 'One‑sentence summary used for SEO and link previews.';
+    // Optional social share image (absolute URL or relative path)
+    // $pageImage = images('hero/example.jpg');
+    // $pageImageAlt = 'Accessible description of the hero image';
+@endphp
+```
+
+The layout consumes these to output:
+- `<title>` and meta `description`
+- Canonical link (defaults to current URL)
+- Open Graph and Twitter tags (title, description, URL, and image if provided)
+
+Keep titles concise (50–60 chars ideal) and descriptions ~155 chars. Provide `$pageImage` only when it meaningfully represents the page.
 
 ---
 

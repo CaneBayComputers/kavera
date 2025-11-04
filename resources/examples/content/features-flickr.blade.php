@@ -1,4 +1,10 @@
 @extends('templates.main')
+
+@php
+    $pageTitle = 'Flickr Galleries Integration';
+    $pageDescription = 'Curate albums on Flickr and render cached galleries on your site without runtime API calls.';
+@endphp
+
 @section('content')
 <section class="py-5"><div class="container">
   <h1 class="mb-3">Flickr Galleries</h1>
@@ -10,4 +16,3 @@
   </ul>
 </div></section>
 @endsection
-

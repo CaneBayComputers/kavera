@@ -1,5 +1,24 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Kavera on Laravel — Build Websites at Agent Speed';
+    $pageDescription = 'A Laravel‑native starter that combines flat‑file content with service‑driven data — pages are simple Blade files, forms include email + webhooks, and events, galleries, posts, and stock images are ready to slot in.';
+    // Optional: uncomment to set social share image
+    // $pageImage = images('hero/home-hero.jpg'); // absolute URL auto-generated from relative
+    // $pageImageAlt = 'Abstract gradient graphic with brand colors';
+@endphp
+
+{{--
+SEO variables supported by the main layout:
+- $pageTitle (string)        → <title>, og:title, twitter:title
+- $pageDescription (string)  → meta description, og:description, twitter:description
+- $pageImage (string)        → og:image, twitter:image (absolute or relative path)
+- $pageImageAlt (string)     → og:image:alt, twitter:image:alt
+
+Set these at the top of each content page to control head tags.
+Canonical defaults to the current URL; JSON‑LD can be injected via @section('jsonld').
+--}}
+
 @section('content')
 
 <!-- Hero: Kavera on Laravel -->

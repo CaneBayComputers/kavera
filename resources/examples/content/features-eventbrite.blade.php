@@ -1,4 +1,10 @@
 @extends('templates.main')
+
+@php
+    $pageTitle = 'Eventbrite Events Integration';
+    $pageDescription = 'List upcoming events from your Eventbrite organization and render them from Redis for performance.';
+@endphp
+
 @section('content')
 <section class="py-5"><div class="container">
   <h1 class="mb-3">Eventbrite Events</h1>
@@ -11,4 +17,3 @@
   </ul>
 </div></section>
 @endsection
-

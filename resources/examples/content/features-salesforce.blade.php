@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Salesforce Integration';
+    $pageDescription = 'Create Salesforce Leads (or any sObject) from form submissions with explicit field mapping and sensible defaults.';
+@endphp
+
 @section('content')
 <section class="py-5">
   <div class="container">
@@ -33,4 +38,3 @@
   </div>
 </section>
 @endsection
-

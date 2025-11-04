@@ -1,4 +1,10 @@
 @extends('templates.main')
+
+@php
+    $pageTitle = 'Pixabay Images';
+    $pageDescription = 'Search and embed high‑quality stock images; cache results for static, fast rendering with clean attribution.';
+@endphp
+
 @section('content')
 <section class="py-5"><div class="container">
   <h1 class="mb-3">Pixabay Images</h1>

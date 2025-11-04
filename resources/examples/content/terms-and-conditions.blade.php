@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Terms and Conditions';
+    $pageDescription = 'Understand the terms that govern the use of this website, including acceptable use, IP, and liability.';
+@endphp
+
 @section('content')
 <section class="py-5">
   <div class="container">
@@ -18,4 +23,3 @@
   </div>
   </section>
 @endsection
-

@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Privacy Policy';
+    $pageDescription = 'Learn how ' . config('app.name') . ' collects, uses, and protects your personal information.';
+@endphp
+
 @section('content')
 <section class="py-5">
   <div class="container">
@@ -17,4 +22,3 @@
   </div>
 </section>
 @endsection
-

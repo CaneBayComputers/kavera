@@ -1,5 +1,60 @@
-<html>
+<html lang="en">
     <head>
+        @php
+            // Allow content pages to set via @php block at top:
+            // $pageTitle = '...'; $pageDescription = '...'; (also support $title / $description)
+            $__title = $pageTitle ?? $page_title ?? $title ?? config('app.name');
+            $__description = $pageDescription ?? $page_description ?? $description ?? '';
+            $__canonical = url()->current();
+            // Optional social image (absolute or relative path)
+            $__imgCandidate = $pageImage ?? $ogImage ?? $twitterImage ?? null;
+            $__image = null;
+            if (is_string($__imgCandidate) && trim($__imgCandidate) !== '') {
+                $__image = preg_match('/^https?:\/\//i', $__imgCandidate)
+                    ? $__imgCandidate
+                    : url($__imgCandidate);
+            }
+            $__imageAlt = $pageImageAlt ?? null;
+        @endphp
+
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{{ trim($__title) !== '' ? $__title : config('app.name') }}</title>
+        @if(trim($__description) !== '')
+            <meta name="description" content="{{ e($__description) }}">
+        @endif
+        <link rel="canonical" href="{{ $__canonical }}">
+        <meta name="robots" content="index,follow">
+
+        <!-- Open Graph -->
+        <meta property="og:title" content="{{ e(trim($__title) !== '' ? $__title : config('app.name')) }}">
+        @if(trim($__description) !== '')
+            <meta property="og:description" content="{{ e($__description) }}">
+        @endif
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="{{ $__canonical }}">
+        @if(!empty($__image))
+            <meta property="og:image" content="{{ $__image }}">
+            @if(!empty($__imageAlt))
+                <meta property="og:image:alt" content="{{ e($__imageAlt) }}">
+            @endif
+        @endif
+
+        <!-- Twitter -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{{ e(trim($__title) !== '' ? $__title : config('app.name')) }}">
+        @if(trim($__description) !== '')
+            <meta name="twitter:description" content="{{ e($__description) }}">
+        @endif
+        @if(!empty($__image))
+            <meta name="twitter:image" content="{{ $__image }}">
+            @if(!empty($__imageAlt))
+                <meta name="twitter:image:alt" content="{{ e($__imageAlt) }}">
+            @endif
+        @endif
+
+        @yield('head')
+
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
         <style>

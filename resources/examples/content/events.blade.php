@@ -1,5 +1,10 @@
 @extends('templates.main')
 
+@php
+    $pageTitle = 'Upcoming Events';
+    $pageDescription = 'See live and upcoming events from our Eventbrite organization, cached for fast, reliable display.';
+@endphp
+
 @section('content')
 
 <div class="container my-5">
@@ -74,4 +79,3 @@
 </div>
 
 @endsection
-
