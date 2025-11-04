@@ -74,9 +74,8 @@
               linear-gradient(180deg, #ffffff 0%, #faf5ff 55%, #eff6ff 100%);
             color: #0b1220;
           }
-          .btn-brand { background: var(--brand-accent); border-color: var(--brand-accent); }
-          .btn-brand:hover { background: #dc2748; border-color: #dc2748; }
-          .wave-top svg { display:block; width:100%; height:64px; }
+          .btn-brand { background: var(--brand-accent); border-color: var(--brand-accent); color:#fff; }
+          .btn-brand:hover { background: #dc6b1a; border-color: #dc6b1a; color:#fff; }
           .link-muted { color: var(--brand-muted); }
           /* Navbar links: brighter and legible over gradient */
           .navbar .nav-link { color: rgba(255,255,255,.95) !important; font-weight: 600; letter-spacing:.2px; }
@@ -125,6 +124,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="integrationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Integrations</a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="integrationsDropdown">
+                                <li><a class="dropdown-item" href="/integrations">All Integrations</a></li>
                                 <li><a class="dropdown-item" href="/features-eventbrite">Eventbrite Events</a></li>
                                 <li><a class="dropdown-item" href="/features-flickr">Flickr Galleries</a></li>
                                 <li><a class="dropdown-item" href="/features-blogger">Google Blogger</a></li>
@@ -136,16 +136,12 @@
                                 <li><a class="dropdown-item" href="/features-salesforce">Salesforce</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="examplesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Examples</a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="examplesDropdown">
-                                <li><a class="dropdown-item" href="/events">Events</a></li>
-                                <li><a class="dropdown-item" href="/reviews">Reviews</a></li>
-                                <li><a class="dropdown-item" href="/services">Services</a></li>
-                            </ul>
-                        </li>
-                        <!-- Removed standalone Events; available under Examples dropdown -->
                         <li class="nav-item"><a class="nav-link" href="/contact">Contact</a></li>
+                        <li class="nav-item ms-lg-2">
+                            <a class="nav-link" href="https://github.com/CaneBayComputers/kavera" target="_blank" rel="noopener" aria-label="GitHub">
+                                <i class="bi bi-github" style="font-size:1.25rem;"></i>
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -159,19 +155,17 @@
                 <h2 class="mb-2">Ready to get started?</h2>
                 <p class="mb-3">Use <a class="text-white text-decoration-underline" href="https://github.com/CaneBayComputers/podium-cli" target="_blank" rel="noopener">Podium&nbsp;CLI</a> to clone Kavera, then run the Agent Brief wizard to generate a complete build prompt.</p>
                 <div class="d-inline-block text-start bg-dark bg-opacity-10 border border-light-subtle rounded px-3 py-2 small mb-3">
-<pre class="m-0"><code>podium clone https://github.com/CaneBayComputers/laravel-flat-file-website.git
-cd laravel-flat-file-website
+<pre class="m-0"><code>podium clone https://github.com/CaneBayComputers/kavera.git
+cd kavera
 podium art app:agent-brief</code></pre>
                 </div>
                 <div class="mt-2">
-                  <a href="/features" class="btn btn-lg btn-light me-2">See Features</a>
-                  <a href="/contact" class="btn btn-lg btn-outline-light">Get in Touch</a>
+                  <a href="/integrations" class="btn btn-lg btn-brand me-2">See Integrations</a>
+                  <a href="/contact" class="btn btn-lg btn-brand">Get in Touch</a>
                 </div>
             </div>
         </div>
-        <div class="wave-top" aria-hidden="true">
-          <svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,32 C240,80 480,-16 720,16 C960,48 1200,16 1440,32 L1440,0 L0,0 Z" fill="var(--brand-primary)" opacity=".2"/></svg>
-        </div>
+        
         <!-- Footer -->
         <footer id="footer" class="text-white pt-5 pb-4 footer-gradient footer-shapes">
             <div class="shape triangle"></div>
@@ -180,21 +174,13 @@ podium art app:agent-brief</code></pre>
             <div class="container">
                 <div class="row g-4">
                     <div class="col-md-6 col-lg-4">
-                        <h5 class="text-uppercase mb-2">About</h5>
+                        <h5 class="text-uppercase mb-2">Open Source</h5>
                         <div class="mb-3" style="width: 64px; border-bottom: 2px solid var(--brand-accent);"></div>
-                        <p class="small mb-3">A flat‑file Laravel starter with forms, email, and Redis‑backed content validation. Easily adapt for landing pages and small sites.</p>
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="bi bi-geo-alt-fill me-2"></i>
-                            <span>123 Main St, Anytown, USA</span>
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="bi bi-envelope-fill me-2"></i>
-                            <a class="text-decoration-none" href="mailto:hello@example.com">hello@example.com</a>
-                        </div>
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-telephone-fill me-2"></i>
-                            <span>(555) 123-4567</span>
-                        </div>
+                        <p class="small mb-3">Kavera is an open‑source Laravel website framework focused on flat‑file content, fast rendering, and simple service integrations.</p>
+                        <p class="small mb-3">Contribute, file issues, or follow development on GitHub.</p>
+                        <a class="d-inline-flex align-items-center justify-content-center" href="https://github.com/CaneBayComputers/kavera" target="_blank" rel="noopener" aria-label="GitHub">
+                            <i class="bi bi-github" style="font-size:1.5rem;"></i>
+                        </a>
                     </div>
 
                     <div class="col-md-6 col-lg-4">
@@ -202,9 +188,7 @@ podium art app:agent-brief</code></pre>
                         <div class="mb-3" style="width: 64px; border-bottom: 2px solid var(--brand-accent);"></div>
                         <ul class="list-unstyled small mb-0">
                             <li class="mb-2"><a href="/" class="text-decoration-none">Home</a></li>
-                            <li class="mb-2"><a href="/features" class="text-decoration-none">Features</a></li>
-                            <li class="mb-2"><a href="/services" class="text-decoration-none">Services</a></li>
-                            <li class="mb-2"><a href="/reviews" class="text-decoration-none">Reviews</a></li>
+                            <li class="mb-2"><a href="/integrations" class="text-decoration-none">Integrations</a></li>
                             <li class="mb-2"><a href="/contact" class="text-decoration-none">Contact</a></li>
                             <li class="mb-2"><a href="/terms-and-conditions" class="text-decoration-none">Terms &amp; Conditions</a></li>
                             <li><a href="/privacy-policy" class="text-decoration-none">Privacy Policy</a></li>
@@ -232,7 +216,7 @@ podium art app:agent-brief</code></pre>
                             </div>
                             <input type="hidden" id="recaptcha-signup" name="recaptcha" value="">
                             <div class="col-12">
-                                <button class="btn btn-light w-100" type="submit">Sign Up</button>
+                                <button class="btn btn-lg btn-brand w-100" type="submit">Sign Up</button>
                             </div>
                         </form>
                         @push('script')

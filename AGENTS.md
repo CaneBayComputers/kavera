@@ -14,6 +14,7 @@ This section defines how any AI agent (e.g., Codex, Cursor, Aider, or GPT CLI) s
 2. `composer.json` – PHP dependencies and autoloading configuration
 3. `.env` – environment variables and active service settings
 4. `app/helpers.php` – global helper functions and environment logic
+5. `TODO.md` - Planned features and updates
 
 ---
 

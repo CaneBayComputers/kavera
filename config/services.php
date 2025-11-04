@@ -56,4 +56,13 @@ return [
         'timeout' => env('PIXABAY_TIMEOUT', 6),
     ],
 
+    'blogger' => [
+        'api_key' => env('BLOGGER_API_KEY'),
+        'blog_id' => env('BLOGGER_BLOG_ID'),
+        'base_url' => env('BLOGGER_BASE_URL', 'https://www.googleapis.com/blogger/v3'),
+        'timeout' => env('BLOGGER_TIMEOUT', 8),
+        'cache_key' => env('BLOGGER_CACHE_KEY', 'blogger.posts'),
+        'max_results' => env('BLOGGER_MAX_RESULTS', 50),
+    ],
+
 ];

@@ -344,3 +344,27 @@ if (!function_exists('eventbrite_image_url')) {
         return null;
     }
 }
+
+if (!function_exists('blogger_enabled')) {
+    function blogger_enabled(): bool
+    {
+        $apiKey = config('services.blogger.api_key');
+        $blogId = config('services.blogger.blog_id');
+        return !empty($apiKey) && !empty($blogId);
+    }
+}
+
+if (!function_exists('blogger_fetch_posts')) {
+    /**
+     * Read pre-fetched Blogger posts from cache (populated by artisan command).
+     * Returns an array of normalized posts (see BloggerService::normalizeItem).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    function blogger_fetch_posts(): array
+    {
+        $cacheKey = (string) config('services.blogger.cache_key', 'blogger.posts');
+        $posts = \Illuminate\Support\Facades\Cache::get($cacheKey, []);
+        return is_array($posts) ? $posts : [];
+    }
+}

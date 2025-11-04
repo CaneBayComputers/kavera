@@ -29,7 +29,7 @@ Canonical defaults to the current URL; JSON‑LD can be injected via @section('j
         <h1 class="display-5 fw-bold mb-3">Kavera on Laravel: Build Websites at Agent Speed</h1>
         <p class="lead mb-3">A clean Laravel starter so <strong>AI agents can assemble real sites fast</strong> — pages are simple Blade files, routing is pre‑validated for safety, and forms ship with email + webhooks. Add events, galleries, posts, and stock images — <strong>no plugin drama</strong>.</p>
         <p class="mb-4 small">Bonus: sensible SEO defaults — pages set proper title tags, and the Agent Brief suggests keywords you can pepper through copy and headings.</p>
-        <a href="/features" class="btn btn-light btn-lg me-2">See Features</a>
+        <a href="/integrations" class="btn btn-brand btn-lg me-2">See Integrations</a>
         <a href="/#footer" class="btn btn-outline-light btn-lg">Get Updates</a>
       </div>
       <div class="col-lg-5 text-center">
