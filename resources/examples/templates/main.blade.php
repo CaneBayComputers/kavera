@@ -119,27 +119,40 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
+                    @php $blogBase = trim((string) config('services.blogger.content_base', 'blog'), '/'); @endphp
                     <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
                         <li class="nav-item"><a class="nav-link active" aria-current="page" href="/">Home</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/{{ $blogBase }}">Blog</a></li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="integrationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Integrations</a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="integrationsDropdown">
                                 <li><a class="dropdown-item" href="/integrations">All Integrations</a></li>
-                                <li><a class="dropdown-item" href="/features-eventbrite">Eventbrite Events</a></li>
-                                <li><a class="dropdown-item" href="/features-flickr">Flickr Galleries</a></li>
-                                <li><a class="dropdown-item" href="/features-blogger">Google Blogger</a></li>
-                                <li><a class="dropdown-item" href="/features-pixabay">Pixabay Images</a></li>
+                                <li><a class="dropdown-item" href="/integrations/eventbrite">Eventbrite Events</a></li>
+                                <li><a class="dropdown-item" href="/integrations/flickr">Flickr Galleries</a></li>
+                                <li><a class="dropdown-item" href="/integrations/blogger">Google Blogger</a></li>
+                                <li><a class="dropdown-item" href="/integrations/pixabay">Pixabay Images</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="/features-forms">Forms &amp; Webhooks</a></li>
-                                <li><a class="dropdown-item" href="/features-mailchimp">Mailchimp</a></li>
-                                <li><a class="dropdown-item" href="/features-zapier">Zapier</a></li>
-                                <li><a class="dropdown-item" href="/features-salesforce">Salesforce</a></li>
+                                <li><a class="dropdown-item" href="/integrations/forms">Forms &amp; Webhooks</a></li>
+                                <li><a class="dropdown-item" href="/integrations/mailchimp">Mailchimp</a></li>
+                                <li><a class="dropdown-item" href="/integrations/zapier">Zapier</a></li>
+                                <li><a class="dropdown-item" href="/integrations/salesforce">Salesforce</a></li>
                             </ul>
                         </li>
                         <li class="nav-item"><a class="nav-link" href="/contact">Contact</a></li>
                         <li class="nav-item ms-lg-2">
                             <a class="nav-link" href="https://github.com/CaneBayComputers/kavera" target="_blank" rel="noopener" aria-label="GitHub">
                                 <i class="bi bi-github" style="font-size:1.25rem;"></i>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link d-flex align-items-center gap-1" href="https://www.patreon.com/canebaycomputers" target="_blank" rel="noopener" aria-label="Donate on Patreon">
+                                <i class="bi bi-heart-fill" style="font-size:1.1rem;"></i>
+                                <span class="d-none d-lg-inline">Donate</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="https://www.youtube.com/CaneBayComputersMobile" target="_blank" rel="noopener" aria-label="YouTube">
+                                <i class="bi bi-youtube" style="font-size:1.25rem;"></i>
                             </a>
                         </li>
                     </ul>
@@ -177,17 +190,31 @@ podium art app:agent-brief</code></pre>
                         <h5 class="text-uppercase mb-2">Open Source</h5>
                         <div class="mb-3" style="width: 64px; border-bottom: 2px solid var(--brand-accent);"></div>
                         <p class="small mb-3">Kavera is an open‑source Laravel website framework focused on flat‑file content, fast rendering, and simple service integrations.</p>
-                        <p class="small mb-3">Contribute, file issues, or follow development on GitHub.</p>
-                        <a class="d-inline-flex align-items-center justify-content-center" href="https://github.com/CaneBayComputers/kavera" target="_blank" rel="noopener" aria-label="GitHub">
-                            <i class="bi bi-github" style="font-size:1.5rem;"></i>
-                        </a>
+                        <p class="small mb-3">Contribute, support, or follow development:</p>
+                        <div class="d-flex align-items-center gap-3">
+                            <a class="d-inline-flex align-items-center justify-content-center" href="https://github.com/CaneBayComputers/kavera" target="_blank" rel="noopener" aria-label="GitHub">
+                                <i class="bi bi-github" style="font-size:1.5rem;"></i>
+                            </a>
+                            <a class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" href="https://www.patreon.com/canebaycomputers" target="_blank" rel="noopener" aria-label="Donate on Patreon">
+                                <i class="bi bi-heart-fill"></i>
+                                <span>Donate</span>
+                            </a>
+                            <a class="d-inline-flex align-items-center justify-content-center" href="https://www.facebook.com/canebaycomputers" target="_blank" rel="noopener" aria-label="Facebook">
+                                <i class="bi bi-facebook" style="font-size:1.5rem;"></i>
+                            </a>
+                            <a class="d-inline-flex align-items-center justify-content-center" href="https://www.youtube.com/CaneBayComputersMobile" target="_blank" rel="noopener" aria-label="YouTube">
+                                <i class="bi bi-youtube" style="font-size:1.5rem;"></i>
+                            </a>
+                        </div>
                     </div>
 
                     <div class="col-md-6 col-lg-4">
                         <h5 class="text-uppercase mb-2">Quick Links</h5>
                         <div class="mb-3" style="width: 64px; border-bottom: 2px solid var(--brand-accent);"></div>
                         <ul class="list-unstyled small mb-0">
+                            @php $blogBase = trim((string) config('services.blogger.content_base', 'blog'), '/'); @endphp
                             <li class="mb-2"><a href="/" class="text-decoration-none">Home</a></li>
+                            <li class="mb-2"><a href="/{{ $blogBase }}" class="text-decoration-none">Blog</a></li>
                             <li class="mb-2"><a href="/integrations" class="text-decoration-none">Integrations</a></li>
                             <li class="mb-2"><a href="/contact" class="text-decoration-none">Contact</a></li>
                             <li class="mb-2"><a href="/terms-and-conditions" class="text-decoration-none">Terms &amp; Conditions</a></li>
@@ -239,7 +266,7 @@ podium art app:agent-brief</code></pre>
                 </div>
 
                 <hr class="border-secondary mt-4">
-                <div class="text-center small link-muted">&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</div>
+                <div class="text-center small link-muted">&copy; {{ date('Y') }} Cane Bay Computers &amp; Mobile Repair, LLC. All rights reserved.</div>
             </div>
         </footer>
         

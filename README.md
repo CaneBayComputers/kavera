@@ -124,3 +124,15 @@ Looking for code examples, mapping, or integration setup? See AGENTS.md for:
 - Podium commands and troubleshooting
 
 This keeps the README friendly while making the deeper bits easy to find.
+
+---
+
+## 📄 License
+
+Kavera is open source under the MIT License.
+
+- License: see `LICENSE`
+- Copyright: © 2024–2025 Cane Bay Computers & Mobile Repair, LLC
+- Authors: see `AUTHORS`
+
+Note: “Kavera” and its logos are trademarks of Cane Bay Computers & Mobile Repair, LLC. The MIT license does not grant trademark rights.

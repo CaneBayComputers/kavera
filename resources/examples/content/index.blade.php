@@ -33,18 +33,16 @@ Canonical defaults to the current URL; JSON‑LD can be injected via @section('j
         <a href="/#footer" class="btn btn-outline-light btn-lg">Get Updates</a>
       </div>
       <div class="col-lg-5 text-center">
-        <svg viewBox="0 0 220 160" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decorative graphic">
-          <defs>
-            <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stop-color="#22d3ee"/>
-              <stop offset="100%" stop-color="#0d6efd"/>
-            </linearGradient>
-          </defs>
-          <rect x="10" y="10" rx="16" ry="16" width="200" height="120" fill="url(#g1)" opacity="0.25"/>
-          <circle cx="70" cy="70" r="18" fill="#fff" opacity="0.9"/>
-          <rect x="110" y="50" width="70" height="10" rx="5" fill="#fff" opacity="0.9"/>
-          <rect x="110" y="68" width="56" height="10" rx="5" fill="#fff" opacity="0.7"/>
-          <rect x="110" y="86" width="48" height="10" rx="5" fill="#fff" opacity="0.5"/>
+        <svg viewBox="0 0 21.359989 18.335836" role="img" aria-label="Kavera logo" class="img-fluid" style="max-width: 360px; height: auto;" xmlns="http://www.w3.org/2000/svg">
+          <g transform="translate(-25.287292,-13.474625)">
+            <path d="M 49.78125,129.82943 V 60.529427 h 15.6 v 26.2 l 23.7,-26.2 h 18.5 l -29.3,31.9 30.9,37.400003 h -18.5 l -25.3,-29.3 v 29.3 z" transform="matrix(0.26458333,0,0,0.26458333,12.116003,-2.5404522)" fill="#ffffff"/>
+          </g>
+          <g transform="translate(-19.652699,-13.474625)">
+            <path d="M 89.081057,60.529444 59.626283,92.466603 90.680667,129.83023 H 109.18067 L 78.280276,92.429835 107.58106,60.529444 Z" transform="matrix(0.26458333,0,0,0.26458333,12.116003,-2.5404522)" fill="#6b6969"/>
+          </g>
+          <g transform="translate(-25.287292,-13.474625)">
+            <path d="m 46.647282,14.153658 -7.386113,7.761283 7.386113,8.860441 v -5.173327 l -3.073714,-3.687114 3.073714,-3.229777 z" fill="#acaaaa"/>
+          </g>
         </svg>
       </div>
     </div>

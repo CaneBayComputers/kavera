@@ -63,6 +63,15 @@ return [
         'timeout' => env('BLOGGER_TIMEOUT', 8),
         'cache_key' => env('BLOGGER_CACHE_KEY', 'blogger.posts'),
         'max_results' => env('BLOGGER_MAX_RESULTS', 50),
+        // Base content path for future on-disk imports (e.g., "blog" → /content/blog/...)
+        'content_base' => env('BLOGGER_CONTENT_BASE', 'blog'),
+        // Subfolder in storage/app for raw dumps and import artifacts
+        'storage_dir' => env('BLOGGER_STORAGE_DIR', 'blogger'),
+        // Layout template and section used for imported post files
+        'post_layout' => env('BLOGGER_POST_LAYOUT', 'templates.blog'),
+        'post_section' => env('BLOGGER_POST_SECTION', 'blog_content'),
+        // URL segment name for label/category listing under the content base
+        'label_segment' => env('BLOGGER_LABEL_SEGMENT', 'labels'),
     ],
 
 ];

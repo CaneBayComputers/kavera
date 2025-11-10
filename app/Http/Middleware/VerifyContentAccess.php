@@ -26,10 +26,22 @@ class VerifyContentAccess
             return $next($request);
         }
 
-        // Regex: allow only letters, numbers, slashes, and dashes
-        if ( ! preg_match('/^[a-zA-Z0-9\/-]+$/', $path) ) 
+        // Regex: allow only characters defined in configuration
+        $regex = (string) config('content.allowed_path_regex', '/^[a-zA-Z0-9\/-]+$/');
+        if ( ! preg_match($regex, $path) ) 
         {
             abort(404);
+        }
+
+        // Allow dynamic blog routes to pass through (handled by BlogController)
+        $base = trim((string) config('services.blogger.content_base', 'blog'), '/');
+        $labelSeg = trim((string) config('services.blogger.label_segment', 'labels'), '/');
+        if ($base !== '' && (
+            $path === $base ||
+            preg_match('#^' . preg_quote($base, '#') . '/' . preg_quote($labelSeg, '#') . '/[^/]+$#', $path) ||
+            preg_match('#^' . preg_quote($base, '#') . '/\d{4}/\d{2}$#', $path)
+        )) {
+            return $next($request);
         }
 
         $content_list = Redis::get('content_list');

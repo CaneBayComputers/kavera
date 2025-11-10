@@ -20,7 +20,7 @@
       <p class="small">Example (run from project directory with Podium):</p>
       <pre class="small bg-light p-3"><code>podium art app:pixabay-search "abstract geometric memphis pattern" --per_page=9 &gt; storage/app/pixabay/services.json</code></pre>
       <p class="small">Then in your Blade page, load <code>storage/app/pixabay/services.json</code> and loop over <code>hits</code> for <code>webformatURL</code>/<code>largeImageURL</code>.</p>
-      <p class="mb-0">See a live example on the <a href="/services">Services</a> page—those tiles are generated from a cached Pixabay search.</p>
+      <p class="mb-0">See a live example on the Services page—those tiles are generated from a cached Pixabay search.</p>
     </div>
     <div class="col-lg-5">
       <div class="p-3 border bg-white small">
@@ -35,3 +35,4 @@
   </div>
 </div></section>
 @endsection
+

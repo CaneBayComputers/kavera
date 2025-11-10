@@ -92,6 +92,18 @@ utility classes rather than inline styling.
   ```
 
   Run this whenever content files are added, removed, or name is modified.
+  
+  If you are running Podium commands from a non-interactive agent or in an environment without a TTY (e.g., this AI harness), wrap the command with `script` so Podium receives a pseudo‑TTY:
+
+  ```bash
+  script -q -c "podium art app:update-content-list" /dev/null
+  ```
+  
+  General pattern for Podium via agents/CI:
+  
+  ```bash
+  script -q -c "podium art <command> [options]" /dev/null
+  ```
 * All links must use root-scoped anchors (e.g., `/` or `/#contact`) for navigation consistency.
 * Custom helpers live in `app/helpers.php` and include:
 

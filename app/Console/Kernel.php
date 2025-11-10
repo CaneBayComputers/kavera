@@ -15,6 +15,8 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\GenerateAgentBrief::class,
         \App\Console\Commands\ShowFormSubmission::class,
+        \App\Console\Commands\DumpBlogger::class,
+        \App\Console\Commands\ImportBlogger::class,
     ];
 
     /**
@@ -23,10 +25,10 @@ class Kernel extends ConsoleKernel
      * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
      * @return void
      */
+    /** @SuppressWarnings(PHPMD.UnusedFormalParameter) */
     protected function schedule(Schedule $schedule)
     {
-        // No scheduled commands yet; keep parameter intentionally unused.
-        (void) $schedule;
+        // No scheduled commands yet.
     }
 
     /**

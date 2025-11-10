@@ -90,5 +90,18 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Cane Bay Computers & Mobile Repair, LLC",
+            "email": "support@canebaycomputers.com",
+            "homepage": "https://www.canebaycomputers.com",
+            "role": "Developer"
+        },
+        {
+            "name": "Shawn",
+            "email": "shrimpwagon@gmail.com",
+            "role": "Author"
+        }
+    ]
 }

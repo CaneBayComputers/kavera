@@ -1,20 +1,22 @@
 @extends('templates.main')
 
 @php
-    $pageTitle = 'Upcoming Events';
-    $pageDescription = 'See live and upcoming events from our Eventbrite organization, cached for fast, reliable display.';
+    $pageTitle = 'Eventbrite Events Integration';
+    $pageDescription = 'List upcoming events from your Eventbrite organization and render them from Redis for performance.';
 @endphp
 
 @section('content')
+<section class="py-5"><div class="container">
+  <h1 class="mb-3">Eventbrite Events</h1>
+  <p class="text-muted">List upcoming events from your Eventbrite organization, cached in Redis for speed.</p>
+  <h5>Setup</h5>
+  <ul>
+    <li>Set <code>EVENTBRITE_PRIVATE_TOKEN</code> and <code>EVENTBRITE_ORGANIZATION_ID</code> in <code>.env</code>.</li>
+    <li>Fetch events: <code>podium art app:update-eventbrite</code></li>
+  </ul>
+</div></section>
 
-<div class="container my-5">
-    <div class="row mb-4">
-        <div class="col-md-10 mx-auto text-center">
-            <h1 class="display-5">Upcoming Events</h1>
-            <p class="text-muted">Powered by Eventbrite</p>
-        </div>
-    </div>
-
+<div class="container my-4">
     @php
         $configured = eventbrite_enabled();
         $events = $configured ? eventbrite_fetch_events() : [];
@@ -26,7 +28,7 @@
                 <div class="alert alert-warning">
                     <strong>Eventbrite not configured.</strong>
                     <div class="mt-2">
-                        Add <code>EVENTBRITE_TOKEN</code> and <code>EVENTBRITE_ORGANIZATION_ID</code> to your <code>.env</code> file, then refresh content and caches.
+                        Add <code>EVENTBRITE_PRIVATE_TOKEN</code> and <code>EVENTBRITE_ORGANIZATION_ID</code> to your <code>.env</code>, then run <code>podium art app:update-eventbrite</code>.
                     </div>
                 </div>
             </div>
@@ -77,5 +79,5 @@
         @endforelse
     </div>
 </div>
-
 @endsection
+
