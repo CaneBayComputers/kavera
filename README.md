@@ -51,13 +51,14 @@ After this, edits under `resources/views` won’t affect the example set.
 
 ## 🎁 What’s Included
 
-- 📄 Pages: Blade files under `resources/views/content/`, mapped directly to URLs.
+- 📄 Pages: Simple, file‑based pages you can edit fast — no CMS required.
 - ✉️ Forms: Email out of the box plus webhooks (Mailchimp, Zapier, Salesforce).
 - 🧠 Spam control built‑in: UA/link checks, throttling, and Google reCAPTCHA (prod).
-- 🔍 SEO Setup: Title tags on pages; Agent Brief suggests high‑value keywords to pepper through copy and headings.
+- 🔍 SEO Setup: Title/description per page plus optional JSON‑LD schema markup with a built‑in validator.
 - 🎟️ Events: Eventbrite page you can flip on with two env keys.
 - 🖼️ Images: Pixabay helper for quick stock image pulls.
 - 🧭 Agent Brief Wizard: generates a project‑specific prompt to guide any AI agent.
+- 📝 Blogging: Write in Blogger, publish on your site — posts become simple pages with recents, tags, and archives.
 
 ---
 
@@ -78,8 +79,9 @@ After this, edits under `resources/views` won’t affect the example set.
   - Example view: `resources/examples/content/events.blade.php`.
 
 - Blogger
-  - Posts/articles are fetched via the Blogger API and cached in Redis for display in views.
-  - Example view: `resources/examples/content/features-blogger.blade.php`.
+  - Public posts are fetched via the Blogger API (API key only), imported as Blade files for fast, predictable rendering.
+  - Lightweight Redis indices power recent posts, labels, and monthly archives.
+  - Example: `resources/examples/content/integrations/blogger.blade.php` and the blog layout at `resources/examples/templates/blog.blade.php`.
 
 - Flickr
   - Albums and photo sets are synchronized and cached in Redis for gallery components.
@@ -126,6 +128,31 @@ Looking for code examples, mapping, or integration setup? See AGENTS.md for:
 This keeps the README friendly while making the deeper bits easy to find.
 
 ---
+
+## 📝 Blogging Quick Start (Blogger)
+
+1) Enable Blogger API v3 in Google Cloud and create an API key.
+2) Set these in your `.env`:
+
+```
+BLOGGER_API_KEY=your_api_key
+BLOGGER_BLOG_ID=your_blog_id
+# Optional: BLOGGER_CONTENT_BASE (defaults to "blog")
+```
+
+3) Import posts as Blade files and refresh the registry:
+
+```bash
+script -q -c "podium art app:blogger-import --per_page=50" /dev/null
+script -q -c "podium art app:update-content-list" /dev/null
+```
+
+4) View your blog at `/<base>` (default `/blog`). Labels and archives are available at `/<base>/<label-segment>/<label>` and `/<base>/<YYYY>/<MM>`.
+
+Notes
+- Posts render as static Blade files (fast); Redis holds only indices (recent, labels, archives).
+- Default layout is `templates.blog`; customize via `BLOGGER_POST_LAYOUT` and `BLOGGER_POST_SECTION`.
+
 
 ## 📄 License
 

@@ -247,3 +247,69 @@ phpmd <file_path> text ~/.config/phpmd.xml
 # If no user ruleset exists, fall back to categories:
 # phpmd <file_path> text codesize,unusedcode,naming
 ```
+
+---
+
+### Blogger / Blog System
+
+Kavera treats blogging as "imported flat‑files" plus lightweight Redis indices. Agents should understand this model to generate pages, lists, and navigation.
+
+Key concepts
+- Import, don’t fetch at request time: posts import as Blade files under a configurable base (default `blog`).
+- Slugs are cleansed by the same regex used for content routing (see `config/content.php`).
+- Redis stores only indices (recent list, label membership, archives) and compact previews; NOT full HTML bodies.
+- Examples live in `resources/examples` and should remain sample‑only. For real sites, replace the `resources/views` symlink and generate into your own tree (see README Quick Start).
+
+Configuration (`config/services.php` → `services.blogger`)
+- `content_base` (env `BLOGGER_CONTENT_BASE`, default `blog`) – base folder under `resources/views/content` where posts are written
+- `post_layout` (env `BLOGGER_POST_LAYOUT`, default `templates.blog`) – Blade layout used by imported posts
+- `post_section` (env `BLOGGER_POST_SECTION`, default `blog_content`) – section name posts render into
+- `label_segment` (env `BLOGGER_LABEL_SEGMENT`, default `labels`) – URL segment for label listings
+
+Routing (added in `routes/web.php`)
+- `/<base>` → recent posts (from Redis)
+- `/<base>/<label_segment>/<label>` → posts with label (newest first)
+- `/<base>/<YYYY>/<MM>` → monthly archive
+Middleware `VerifyContentAccess` allows these dynamic routes to pass through.
+
+Import command (Blogger → Blade files + Redis indices)
+- Import and overwrite posts as Blade files, never delete old ones:
+
+```bash
+script -q -c "podium art app:blogger-import --per_page=50" /dev/null
+script -q -c "podium art app:update-content-list" /dev/null
+```
+
+What it does
+- Writes each post to `resources/views/content/<base>/<slug>.blade.php`.
+- Strips `.html/.htm` from Blogger URLs before slug cleansing.
+- Generates `.gitignore` in `resources/views/content/<base>` so generated posts aren’t committed; keep `index.blade.php` under version control for customization.
+- Builds Redis indices:
+  - `blogger:post:<id>` – JSON preview {id,title,url,published_at,summary,slug,path,thumb}
+  - `blogger:posts:by_published` – ZSET
+  - `blogger:label:<slug>:ids` – SET membership
+  - `blogger:labels` – HASH counts, `blogger:labels_display` – display names
+  - `blogger:archive:YYYY-MM` – ZSET per month, `blogger:archives` – ZSET of months
+  - `blogger:recent` – precomputed JSON array (top 10)
+
+Helpers (use in templates/layouts)
+- `blogger_recent($n = 10)` – array of recent previews
+- `blogger_labels()` – [slug => {name,count}] sorted by name
+- `blogger_archives()` – ["YYYY-MM", ...] newest first
+- `blogger_label_url($slug)`, `blogger_archive_url($ym)` – build links
+- `blogger_base()`, `blogger_label_segment()` – current config values
+
+Layouts
+- Default post layout `templates.blog` provides:
+  - Main content yield `@section('blog_content')`
+  - Sidebar with Recent, Tags, Archive using helpers
+  - A sample index view at `resources/examples/content/blog/index.blade.php` shows a hero + card grid; copy to your own `resources/views` tree and customize.
+
+Slug and path policy
+- Path allow‑list is controlled by `config/content.php` (`content.allowed_path_regex`).
+- Slug cleansing: non‑matching chars → space, collapse spaces to one dash, lowercase, trim `-`.
+
+Agent guidance
+- Keep `resources/examples` as examples for reference; do not overwrite those when generating a real site.
+- For actual sites, replace the `resources/views` symlink with a real folder, then import posts and refresh the registry.
+- When running Podium in non‑interactive environments, wrap with `script` to provide a pseudo‑TTY (see earlier note).
