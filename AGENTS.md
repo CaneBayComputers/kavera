@@ -14,7 +14,7 @@ This section defines how any AI agent (e.g., Codex, Cursor, Aider, or GPT CLI) s
 2. `composer.json` – PHP dependencies and autoloading configuration
 3. `.env` – environment variables and active service settings
 4. `app/helpers.php` – global helper functions and environment logic
-5. `TODO.md` - Planned features and updates
+5. `resources/examples/content/index.blade.php` - meta tags and schema markup (json-ld) integration
 
 ---
 
@@ -29,9 +29,9 @@ external APIs at runtime.
 
 Kavera does not use a traditional CMS. There is no admin panel for page
 creation. The primary method for defining site structure is creating or editing
-Blade files and partial components.
+Blade files and partial components manually or via an AI agent.
 
-Dynamic content sources include:
+Dynamic content sources include but not limited to:
 - Blogger: Used for posts, articles, news, press releases, staff lists, or any
   repeatable content collection. Pulled through the Blogger API into Redis.
 - Eventbrite: Event data is fetched and normalized into Redis for display on
@@ -43,22 +43,16 @@ Dynamic content sources include:
 - Local public/images directory: Images placed here may be referenced directly
   or described in an optional YAML manifest to assist with semantic placement.
 
-Forms are defined in Blade and configured through Kavera’s form system. Form
-submissions run through validation, throttling, user-agent checks, optional
-Google reCAPTCHA, and message content filters. Valid submissions can be:
-- Emailed (SMTP / Mailhog in development)
-- Stored in the database
-- Sent to external services via webhook adapters (Zapier, Mailchimp, Salesforce)
-
 The "Agent Briefing Wizard" is a CLI command that gathers project details,
 colors, pages, keywords, organization information, and design references. The
 output is a structured prompt for an AI assistant to use when generating page
-content. Use of an AI agent is optional; manual editing is fully supported.
+content or the entire site. Use of an AI agent is optional; manual editing is
+fully supported.
 
 All static content is edited in Blade templates. All dynamic collections are
 accessed from Redis. Do not attempt to modify content through a CMS interface,
 as none exists. Keep HTML structure semantic and rely on existing layout and
-utility classes rather than inline styling.
+utility classes.
 
 
 **Tech Stack**
@@ -145,10 +139,20 @@ Agents can bootstrap pages from images dropped into `public/images` using lightw
 
 Agents should provide a dry‑run and avoid overwriting existing content without `--force`.
 
-### Web Form Mailing Quickstart
+### Web Form Processing
 
-* Use the files listed above to mirror the existing contact form flow.
-* Reuse the Laravel validation rules pattern in `config/form.php` when adding fields.
+Forms are defined in Blade and configured through `config/form.php`. Form
+submissions run through validation, throttling, user-agent checks, optional
+Google reCAPTCHA, and message content filters from logic found in
+`app/Http/Controllers/Form.php`. Valid submissions can be of one or more:
+- Emailed (SMTP / Mailhog)
+- Stored in the database
+- Sent to external services via webhook adapters (Zapier, Mailchimp, Salesforce)
+
+
+* Example web form is found in `resources/examples/content/contact.blade.php`.
+* Use Laravel validation rules pattern in `config/form.php` when adding fields for corresponding form.
+* An unlimited number of forms can exist with each one outlined in the form config.
 * Point new form submissions to `/forms/{form-name}` so they route through `Form::process`.
 * Keep response emails simple - Blade templates in `resources/views/emails` just receive `$formData`.
 * Update `.env` mail targets (`CONTACT_FORM_MAIL_TO`, `CONTACT_FORM_SUCCESS_PAGE`) for destination changes.
