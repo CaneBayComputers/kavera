@@ -31,6 +31,9 @@ class ImportBlogger extends Command
 
         $items = $blogger->fetchAllPosts($perPage, $limit);
 
+        // Reset indices so counts and lists reflect the current import set
+        $this->resetIndices();
+
         $targetDir = base_path('resources/views/content/' . $base);
         File::ensureDirectoryExists($targetDir);
         // Ensure the base has a .gitignore so generated posts are not committed
@@ -105,6 +108,33 @@ class ImportBlogger extends Command
         $this->info("Imported {$count} post(s) under content/{$base}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Clear label counts/sets and archive/order indices before rebuilding.
+     */
+    private function resetIndices(): void
+    {
+        // Clear label counts and display names
+        Redis::del('blogger:labels');
+        Redis::del('blogger:labels_display');
+
+        // Clear per-label id sets
+        $labelSets = Redis::keys('blogger:label:*:ids') ?: [];
+        if (!empty($labelSets)) {
+            Redis::del($labelSets);
+        }
+
+        // Clear archive buckets and month list
+        $archiveBuckets = Redis::keys('blogger:archive:*') ?: [];
+        if (!empty($archiveBuckets)) {
+            Redis::del($archiveBuckets);
+        }
+        Redis::del('blogger:archives');
+
+        // Clear ordering and recent cache
+        Redis::del('blogger:posts:by_published');
+        Redis::del('blogger:recent');
     }
 
     private function deriveSlug(array $post): string
