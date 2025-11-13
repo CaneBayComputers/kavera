@@ -81,23 +81,12 @@ utility classes.
 * Controller: `PageController` renders approved views.
 * Refresh Redis content list:
 
-  ```bash
-  podium art app:update-content-list
-  ```
-
   Run this whenever content files are added, removed, or name is modified.
-  
-  If you are running Podium commands from a non-interactive agent or in an environment without a TTY (e.g., this AI harness), wrap the command with `script` so Podium receives a pseudo‑TTY:
 
   ```bash
-  script -q -c "podium art app:update-content-list" /dev/null
+  php artisan app:update-content-list
   ```
-  
-  General pattern for Podium via agents/CI:
-  
-  ```bash
-  script -q -c "podium art <command> [options]" /dev/null
-  ```
+
 * All links must use root-scoped anchors (e.g., `/` or `/#contact`) for navigation consistency.
 * Custom helpers live in `app/helpers.php` and include:
 
@@ -135,7 +124,7 @@ Agents can bootstrap pages from images dropped into `public/images` using lightw
   1) Scan `public/images` and build a manifest grouped by page slug.
   2) Agent generates `resources/views/content/<page>.blade.php` with sections: hero, features/cards grid, gallery, and optional team/logos, embedding chosen images and alt text.
   3) Use helpers for assets (`images('...')`) so S3 vs local switching works.
-  4) Refresh routes: `podium art app:update-content-list`.
+  4) Refresh routes: `php artisan app:update-content-list`.
 
 Agents should provide a dry‑run and avoid overwriting existing content without `--force`.
 
@@ -193,13 +182,13 @@ This project ships with a JSON‑LD validation command and a simple convention f
 - Validate a single file:
 
 ```bash
-podium art schema:validate-jsonld --file=<slug>.jsonld
+php artisan schema:validate-jsonld --file=<slug>.jsonld
 ```
 
 - Or validate all JSON‑LD files:
 
 ```bash
-podium art schema:validate-jsonld
+php artisan schema:validate-jsonld
 ```
 
 The validator checks:
@@ -280,8 +269,8 @@ Import command (Blogger → Blade files + Redis indices)
 - Import and overwrite posts as Blade files, never delete old ones:
 
 ```bash
-script -q -c "podium art app:blogger-import --per_page=50" /dev/null
-script -q -c "podium art app:update-content-list" /dev/null
+php artisan app:blogger-import --per_page=50
+php artisan app:update-content-list
 ```
 
 What it does
@@ -317,3 +306,21 @@ Agent guidance
 - Keep `resources/examples` as examples for reference; do not overwrite those when generating a real site.
 - For actual sites, replace the `resources/views` symlink with a real folder, then import posts and refresh the registry.
 - When running Podium in non‑interactive environments, wrap with `script` to provide a pseudo‑TTY (see earlier note).
+
+---
+
+### Podium Usage
+
+If Podium is installed use the `podium art`  command instead of `php artisan` as this runs artisan inside of the Docker container for a more version targeted execution.
+
+If you are running Podium commands from a non-interactive agent or in an environment without a TTY (e.g., this AI harness), wrap the command with `script` so Podium receives a pseudo‑TTY:
+
+```bash
+script -q -c "podium art app:update-content-list" /dev/null
+```
+
+General pattern for Podium via agents/CI:
+
+```bash
+script -q -c "podium art <command> [options]" /dev/null
+```
