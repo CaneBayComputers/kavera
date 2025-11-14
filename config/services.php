@@ -56,6 +56,14 @@ return [
         'timeout' => env('PIXABAY_TIMEOUT', 6),
     ],
 
+    'rekognition' => [
+        // Uses standard AWS_* envs for credentials
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'version' => env('AWS_SDK_VERSION', 'latest'),
+        'max_labels' => env('AWS_REKOGNITION_MAX_LABELS', 10),
+        'min_confidence' => env('AWS_REKOGNITION_MIN_CONFIDENCE', 70),
+    ],
+
     'blogger' => [
         'api_key' => env('BLOGGER_API_KEY'),
         'blog_id' => env('BLOGGER_BLOG_ID'),
