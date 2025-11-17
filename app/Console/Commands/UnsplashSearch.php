@@ -7,77 +7,65 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-class PixabaySearch extends Command
+class UnsplashSearch extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'app:pixabay-search
+    protected $signature = 'app:unsplash-search
         {query* : Search terms}
-        {--image_type=photo}
-        {--orientation=}
-        {--order=popular}
-        {--safesearch=1}
         {--per_page=10}
         {--page=1}
-        {--category=}
-        {--no-console : Do not write JSON to stdout}';
+        {--orientation=}
+        {--no-console : Do not write per-image log lines}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Search Pixabay, download JPEGs, and merge tags into XMP dc:subject metadata';
+    protected $description = 'Search Unsplash, download JPEGs (urls.raw), and write combined description into XMP dc:description';
 
     public function handle(): int
     {
-        $key = (string) config('services.pixabay.key');
-        $baseUrl = (string) config('services.pixabay.base_url', 'https://pixabay.com/api/');
-        $timeout = (int) config('services.pixabay.timeout', 6);
+        $accessKey = (string) config('services.unsplash.access_key');
+        $baseUrl = (string) config('services.unsplash.base_url', 'https://api.unsplash.com');
+        $timeout = (int) config('services.unsplash.timeout', 8);
 
-        if ($key === '') {
-            $this->error('PIXABAY_API_KEY not configured');
+        if ($accessKey === '') {
+            $this->error('UNSPLASH_ACCESS_KEY not configured');
             return self::FAILURE;
         }
 
-        $q = trim(implode(' ', (array) $this->argument('query')));
-        if ($q === '') {
+        $query = trim(implode(' ', (array) $this->argument('query')));
+        if ($query === '') {
             $this->error('Empty query');
             return self::FAILURE;
         }
 
         $params = [
-            'key' => $key,
-            'q' => $q,
-            'image_type' => (string) $this->option('image_type'),
-            'orientation' => (string) ($this->option('orientation') ?: ''),
-            'order' => (string) $this->option('order'),
-            'safesearch' => (string) $this->option('safesearch'),
+            'query' => $query,
             'per_page' => (int) $this->option('per_page'),
             'page' => (int) $this->option('page'),
-            'category' => (string) ($this->option('category') ?: ''),
         ];
-
-        // Remove empty optional params
-        $params = array_filter($params, static function ($v) {
-            return !($v === '' || $v === null);
-        });
+        $orientation = (string) $this->option('orientation');
+        if ($orientation !== '') {
+            $params['orientation'] = $orientation;
+        }
 
         $writeConsole = ! (bool) $this->option('no-console');
 
-        // Build run-specific directory name under storage/app/private/images/pixabay
-        $slug = Str::slug($q, '-');
+        $slug = Str::slug($query, '-');
         if ($slug === '') {
-            $slug = 'pixabay-query';
+            $slug = 'unsplash-query';
         }
         $timestamp = date('Ymd_His');
-        $baseDirectory = 'images/pixabay';
+        $baseDirectory = 'images/unsplash';
         $runDirectory = $baseDirectory . '/' . $slug . '-' . $timestamp;
 
-        $disk = Storage::disk('local'); // maps to storage/app/private
+        $disk = Storage::disk('local'); // storage/app/private
         if (! $disk->exists($baseDirectory)) {
             $disk->makeDirectory($baseDirectory);
         }
@@ -86,35 +74,38 @@ class PixabaySearch extends Command
         }
 
         try {
-            $resp = Http::timeout($timeout)->get($baseUrl, $params);
+            $url = rtrim($baseUrl, '/') . '/search/photos';
+            $resp = Http::timeout($timeout)
+                ->withHeaders([
+                    'Accept-Version' => 'v1',
+                    'Authorization' => 'Client-ID ' . $accessKey,
+                ])
+                ->get($url, $params);
+
             if (! $resp->ok()) {
-                throw new \RuntimeException('Pixabay API error, status ' . $resp->status());
+                throw new \RuntimeException('Unsplash API error, status ' . $resp->status());
             }
 
             $decoded = $resp->json();
             if (! is_array($decoded)) {
-                throw new \RuntimeException('Pixabay response is not valid JSON.');
+                throw new \RuntimeException('Unsplash response is not valid JSON.');
             }
 
-            $hits = $decoded['hits'] ?? [];
-            if (! is_array($hits)) {
-                throw new \RuntimeException('Pixabay response did not contain a hits array.');
-            }
-
-            if ($hits === []) {
+            $results = $decoded['results'] ?? [];
+            if (! is_array($results) || $results === []) {
                 if ($writeConsole) {
-                    $this->info('No Pixabay results for query: ' . $q);
+                    $this->info('No Unsplash results for query: ' . $query);
                 }
                 return self::SUCCESS;
             }
 
             $savedCount = 0;
-            foreach ($hits as $hit) {
-                if (! is_array($hit)) {
+            foreach ($results as $photo) {
+                if (! is_array($photo)) {
                     continue;
                 }
 
-                $this->downloadAndTagImage($hit, $disk, $runDirectory, $writeConsole);
+                $this->downloadAndTagImage($photo, $disk, $runDirectory, $writeConsole);
                 $savedCount++;
             }
 
@@ -124,59 +115,75 @@ class PixabaySearch extends Command
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error('Pixabay search failed: ' . $e->getMessage());
+            $this->error('Unsplash search failed: ' . $e->getMessage());
             return self::FAILURE;
         }
     }
 
     /**
-     * Download a single Pixabay JPEG and merge its tags into XMP dc:subject.
+     * Download a single Unsplash JPEG using urls.raw and write combined description into XMP dc:description.
      *
-     * @param array<string,mixed> $hit
+     * @param array<string,mixed> $photo
      * @throws \RuntimeException
      */
-    private function downloadAndTagImage(array $hit, $disk, string $runDirectory, bool $writeConsole): void
+    private function downloadAndTagImage(array $photo, $disk, string $runDirectory, bool $writeConsole): void
     {
-        $id = (string) ($hit['id'] ?? '');
-        $tags = (string) ($hit['tags'] ?? '');
-        $large = (string) ($hit['largeImageURL'] ?? ($hit['webformatURL'] ?? ''));
+        $id = (string) ($photo['id'] ?? '');
 
-        if ($large === '') {
-            throw new \RuntimeException('Missing largeImageURL/webformatURL for hit ' . ($id !== '' ? $id : '[unknown id]'));
+        $urls = $photo['urls'] ?? [];
+        $imageUrl = null;
+        if (is_array($urls)) {
+            // Prefer the raw URL as requested.
+            $imageUrl = (string) ($urls['raw'] ?? $urls['full'] ?? $urls['regular'] ?? '');
+        }
+        if ($imageUrl === null || $imageUrl === '') {
+            throw new \RuntimeException('Missing image URL (urls.raw/full/regular) for Unsplash photo ' . ($id !== '' ? $id : '[unknown id]'));
         }
 
-        $pathPart = (string) parse_url($large, PHP_URL_PATH);
+        $description = trim((string) ($photo['description'] ?? ''));
+        $alt = trim((string) ($photo['alt_description'] ?? ''));
+
+        $combined = '';
+        if ($description !== '' && $alt !== '') {
+            $combined = $description . ' (' . $alt . ')';
+        } elseif ($description !== '') {
+            $combined = $description;
+        } elseif ($alt !== '') {
+            $combined = $alt;
+        }
+
+        $pathPart = (string) parse_url($imageUrl, PHP_URL_PATH);
         $ext = strtolower(pathinfo($pathPart, PATHINFO_EXTENSION) ?: 'jpg');
         if (! in_array($ext, ['jpg', 'jpeg', 'jpe'], true)) {
-            throw new \RuntimeException('Non-JPEG image for hit ' . $id . ' (' . $large . ')');
+            $ext = 'jpg';
         }
 
-        $baseName = $id !== '' ? 'pixabay-' . $id : 'pixabay-' . md5($large);
+        $baseName = $id !== '' ? 'unsplash-' . $id : 'unsplash-' . md5($imageUrl);
         $relativePath = rtrim($runDirectory, '/') . '/' . $baseName . '.' . $ext;
 
-        $resp = Http::timeout(20)->get($large);
+        $resp = Http::timeout(20)->get($imageUrl);
         if (! $resp->ok()) {
-            throw new \RuntimeException('Failed to download image for hit ' . $id . '. Status ' . $resp->status());
+            throw new \RuntimeException('Failed to download image for Unsplash photo ' . $id . '. Status ' . $resp->status());
         }
 
-        // Save the original JPEG bytes as returned by Pixabay.
         $disk->put($relativePath, $resp->body());
         $absolutePath = $disk->path($relativePath);
 
-        // Embed tags into XMP dc:subject while preserving pixel data and other metadata.
-        $this->embedTagsIntoJpeg($absolutePath, $tags);
+        if ($combined !== '') {
+            $this->embedDescriptionIntoJpegXmp($absolutePath, $combined);
+        }
 
         if ($writeConsole) {
-            $this->info('Saved image for hit ' . $id . ' to storage/app/private/' . $relativePath);
+            $this->info('Saved image for Unsplash photo ' . $id . ' to storage/app/private/' . $relativePath);
         }
     }
 
     /**
-     * Embed tags into a JPEG's XMP dc:subject bag, preserving other metadata and pixel data.
+     * Embed a combined description (description + alt_description) into a JPEG's XMP dc:description.
      *
      * @throws \RuntimeException
      */
-    private function embedTagsIntoJpeg(string $path, string $tagsString): void
+    private function embedDescriptionIntoJpegXmp(string $path, string $text): void
     {
         if (! is_file($path)) {
             throw new \RuntimeException('JPEG file not found: ' . $path);
@@ -195,13 +202,7 @@ class PixabaySearch extends Command
             throw new \RuntimeException('File does not appear to be a valid JPEG: ' . $path);
         }
 
-        $tags = $this->normalizeTags($tagsString);
-        if ($tags === []) {
-            // Nothing to add; keep file as-is.
-            return;
-        }
-
-        $updated = $this->updateJpegXmpDcSubject($data, $tags);
+        $updated = $this->updateJpegXmpDcDescription($data, $text);
 
         if (file_put_contents($path, $updated) === false) {
             throw new \RuntimeException('Failed to write updated JPEG metadata: ' . $path);
@@ -209,33 +210,10 @@ class PixabaySearch extends Command
     }
 
     /**
-     * Normalize raw comma-separated Pixabay tags into a unique list.
-     *
-     * @return array<int,string>
-     */
-    private function normalizeTags(string $tagsString): array
-    {
-        $parts = array_map('trim', explode(',', $tagsString));
-        $out = [];
-        foreach ($parts as $tag) {
-            if ($tag === '') {
-                continue;
-            }
-            $key = mb_strtolower($tag);
-            $out[$key] = $tag;
-        }
-
-        return array_values($out);
-    }
-
-    /**
-     * Update or insert an XMP packet with dc:subject bag merged with $tags.
+     * Update or insert an XMP packet with dc:description set to the given text (if blank).
      * Returns full JPEG binary with pixel data preserved.
-     *
-     * @param array<int,string> $tags
-     * @throws \RuntimeException
      */
-    private function updateJpegXmpDcSubject(string $jpegData, array $tags): string
+    private function updateJpegXmpDcDescription(string $jpegData, string $text): string
     {
         $len = strlen($jpegData);
         if ($len < 4) {
@@ -287,7 +265,7 @@ class PixabaySearch extends Command
         }
 
         // Merge or create XMP XML
-        $newXmpXml = $this->mergeXmpDcSubjectXml($existingXmpXml, $tags);
+        $newXmpXml = $this->mergeXmpDcDescriptionXml($existingXmpXml, $text);
         $newXmpSegmentData = $xmpHeader . $newXmpXml;
 
         if ($xmpIndex === null) {
@@ -320,17 +298,15 @@ class PixabaySearch extends Command
     }
 
     /**
-     * Merge tags into an XMP packet's dc:subject bag.
-     *
-     * @param array<int,string> $tags
+     * Merge a single description string into an XMP packet's dc:description element.
      */
-    private function mergeXmpDcSubjectXml(?string $existingXml, array $tags): string
+    private function mergeXmpDcDescriptionXml(?string $existingXml, string $text): string
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = false;
 
-        $description = null;
+        $descriptionNode = null;
 
         if ($existingXml !== null && trim($existingXml) !== '') {
             if (@$dom->loadXML($existingXml)) {
@@ -339,54 +315,27 @@ class PixabaySearch extends Command
                 $xpath->registerNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
                 $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
 
-                $description = $xpath->query('//rdf:RDF/rdf:Description')->item(0);
+                $descriptionNode = $xpath->query('//rdf:RDF/rdf:Description')->item(0);
             }
         }
 
-        if (! $description instanceof \DOMElement) {
-            [$dom, $description] = $this->createBasicXmpDom();
+        if (! $descriptionNode instanceof \DOMElement) {
+            [$dom, $descriptionNode] = $this->createBasicXmpDom();
         }
 
         $xpath = new \DOMXPath($dom);
         $xpath->registerNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
         $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
 
-        $subject = $xpath->query('.//dc:subject', $description)->item(0);
-        if (! $subject instanceof \DOMElement) {
-            $subject = $dom->createElementNS('http://purl.org/dc/elements/1.1/', 'dc:subject');
-            $description->appendChild($subject);
-        }
-
-        $bag = null;
-        foreach ($subject->childNodes as $child) {
-            if ($child instanceof \DOMElement && $child->localName === 'Bag') {
-                $bag = $child;
-                break;
+        $dcDescription = $xpath->query('.//dc:description', $descriptionNode)->item(0);
+        if (! $dcDescription instanceof \DOMElement) {
+            $dcDescription = $dom->createElementNS('http://purl.org/dc/elements/1.1/', 'dc:description', $text);
+            $descriptionNode->appendChild($dcDescription);
+        } elseif (trim((string) $dcDescription->nodeValue) === '') {
+            while ($dcDescription->firstChild) {
+                $dcDescription->removeChild($dcDescription->firstChild);
             }
-        }
-        if (! $bag instanceof \DOMElement) {
-            $bag = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:Bag');
-            $subject->appendChild($bag);
-        }
-
-        // Existing keywords in dc:subject bag
-        $existing = [];
-        foreach ($bag->getElementsByTagName('li') as $li) {
-            $val = (string) $li->nodeValue;
-            if ($val === '') {
-                continue;
-            }
-            $key = mb_strtolower($val);
-            $existing[$key] = true;
-        }
-
-        foreach ($tags as $tag) {
-            $key = mb_strtolower($tag);
-            if (isset($existing[$key])) {
-                continue;
-            }
-            $li = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:li', $tag);
-            $bag->appendChild($li);
+            $dcDescription->appendChild($dom->createTextNode($text));
         }
 
         return $dom->saveXML($dom->documentElement) ?: '';
@@ -409,9 +358,9 @@ class PixabaySearch extends Command
         $rdf = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:RDF');
         $xmpmeta->appendChild($rdf);
 
-        $description = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:Description');
-        $rdf->appendChild($description);
+        $descriptionNode = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:Description');
+        $rdf->appendChild($descriptionNode);
 
-        return [$dom, $description];
+        return [$dom, $descriptionNode];
     }
 }

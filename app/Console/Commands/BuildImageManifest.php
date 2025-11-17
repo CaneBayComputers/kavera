@@ -15,15 +15,13 @@ class BuildImageManifest extends Command
      * @var string
      */
     protected $signature = 'app:images-manifest
+        {image? : Optional image path (relative to project base) to analyze}
         {--pages= : Comma-separated page slugs to include}
         {--rekognition : Enable AWS Rekognition label detection}
         {--max-labels=10 : Max Rekognition labels}
         {--min-confidence=70 : Min confidence (0-100)}
+        {--celebrities : Enable Rekognition celebrity recognition (single-image mode)}
         {--format=both : Output format: yaml|json|both}
-        {--pixabay-query= : Optional Pixabay search query to import images}
-        {--pixabay-per-page=12 : Pixabay results per page}
-        {--pixabay-page=1 : Pixabay page number}
-        {--dest=public/images/pixabay : Destination directory for Pixabay downloads (under storage/app)}
         {--force : Overwrite existing manifest files}';
 
     /**
@@ -31,29 +29,28 @@ class BuildImageManifest extends Command
      *
      * @var string
      */
-    protected $description = 'Scan storage/app/public/images and generate image manifest (YAML/JSON) enriched with optional Rekognition keywords';
+    protected $description = 'Generate image manifest from storage/app/public/images or (temporarily) analyze a single image path with Rekognition.';
 
     public function handle(ImageManifestBuilder $builder, RekognitionService $rekognition): int
     {
+        $imagePath = (string) ($this->argument('image') ?? '');
+
+        // Temporary single-image Rekognition test path
+        if ($imagePath !== '') {
+            $withCelebrities = (bool) $this->option('celebrities');
+            return $this->handleSingleImage($imagePath, $rekognition, $withCelebrities);
+        }
+
         $pages = array_filter(array_map('trim', explode(',', (string) $this->option('pages'))));
         $useRekognition = (bool) $this->option('rekognition');
         $maxLabels = (int) $this->option('max-labels');
         $minConfidence = (int) $this->option('min-confidence');
         $format = strtolower((string) $this->option('format')) ?: 'both';
         $force = (bool) $this->option('force');
-        $pixabayQuery = (string) $this->option('pixabay-query');
-        $pixabayPerPage = (int) $this->option('pixabay-per-page');
-        $pixabayPage = (int) $this->option('pixabay-page');
-        $dest = (string) $this->option('dest');
 
-        if ($useRekognition && !$rekognition->isAvailable()) {
+        if ($useRekognition && ! $rekognition->isAvailable()) {
             $this->warn('AWS Rekognition SDK/credentials not available; skipping labels.');
             $useRekognition = false;
-        }
-
-        // Optionally import images from Pixabay before building manifest
-        if ($pixabayQuery !== '') {
-            $this->importFromPixabay($pixabayQuery, $pixabayPerPage, $pixabayPage, $dest);
         }
 
         $manifest = $builder->build([
@@ -71,7 +68,7 @@ class BuildImageManifest extends Command
         $doJson = $format === 'json' || $format === 'both';
 
         if ($doYaml) {
-            if (!$force && $privateDisk->exists($yamlPath)) {
+            if (! $force && $privateDisk->exists($yamlPath)) {
                 $this->error('File exists: storage/app/private/' . $yamlPath . '. Use --force to overwrite.');
                 return self::FAILURE;
             }
@@ -81,7 +78,7 @@ class BuildImageManifest extends Command
         }
 
         if ($doJson) {
-            if (!$force && $privateDisk->exists($jsonPath)) {
+            if (! $force && $privateDisk->exists($jsonPath)) {
                 $this->error('File exists: storage/app/private/' . $jsonPath . '. Use --force to overwrite.');
                 return self::FAILURE;
             }
@@ -94,62 +91,127 @@ class BuildImageManifest extends Command
         return self::SUCCESS;
     }
 
-    private function importFromPixabay(string $query, int $perPage, int $page, string $destDir): void
+    /**
+     * Temporary single-image Rekognition test: copy to /tmp, resize to max 1920px, send to Rekognition,
+     * and write a minimal manifest.json under storage/app/private/images/.
+     */
+    private function handleSingleImage(string $imagePath, RekognitionService $rekognition, bool $withCelebrities): int
     {
-        // Resolve service lazily to avoid hard dependency in signature
-        $service = app(\App\Services\PixabayService::class);
-        if (!$service->isEnabled()) {
-            $this->warn('PIXABAY_API_KEY not configured; skipping Pixabay import.');
-            return;
+        $absolute = $this->resolveImagePath($imagePath);
+        if (! is_file($absolute)) {
+            $this->error('Image not found: ' . $absolute);
+            return self::FAILURE;
         }
 
-        $this->info("Searching Pixabay: '{$query}' (per_page={$perPage}, page={$page})");
-        $hits = $service->search($query, [
-            'per_page' => $perPage,
-            'page' => $page,
-            'safesearch' => 1,
-            'image_type' => 'photo',
-            'order' => 'popular',
-        ]);
-        if (empty($hits)) {
-            $this->warn('No Pixabay results.');
-            return;
+        $info = @getimagesize($absolute);
+        if ($info === false || ($info[2] ?? null) !== IMAGETYPE_JPEG) {
+            $this->error('Image must be a JPEG: ' . $absolute);
+            return self::FAILURE;
         }
 
-        if (!str_starts_with($destDir, 'public/')) {
-            $this->warn("Destination '{$destDir}' is not under 'public/'. Using default 'public/images/pixabay'.");
-            $destDir = 'public/images/pixabay';
-        }
-        if (!Storage::exists($destDir)) {
-            Storage::makeDirectory($destDir);
+        $tmpDir = sys_get_temp_dir();
+        $baseName = basename($absolute);
+        $tmpPath = rtrim($tmpDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $baseName;
+
+        if (! copy($absolute, $tmpPath)) {
+            $this->error('Failed to copy image to temp path: ' . $tmpPath);
+            return self::FAILURE;
         }
 
-        $saved = 0;
-        foreach ($hits as $hit) {
-            $imageId = (string) ($hit['id'] ?? '');
-            $large = (string) ($hit['largeImageURL'] ?? ($hit['webformatURL'] ?? ''));
-            if ($imageId === '' || $large === '') {
-                continue;
-            }
-            $ext = pathinfo(parse_url($large, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION) ?: 'jpg';
-            $name = 'pixabay-' . $imageId . '.' . strtolower($ext);
-            $path = rtrim($destDir, '/') . '/' . $name;
-            if (Storage::exists($path)) {
-                continue;
+        [$width, $height] = [$info[0] ?? 0, $info[1] ?? 0];
+        $maxDim = max($width, $height);
+
+        $resizedWidth = $width;
+        $resizedHeight = $height;
+
+        if ($maxDim > 1920 && $width > 0 && $height > 0) {
+            $scale = 1920 / $maxDim;
+            $resizedWidth = (int) round($width * $scale);
+            $resizedHeight = (int) round($height * $scale);
+
+            $srcImg = imagecreatefromjpeg($tmpPath);
+            if (! $srcImg) {
+                $this->error('Failed to create image resource from temp JPEG.');
+                return self::FAILURE;
             }
 
-            try {
-                $resp = \Illuminate\Support\Facades\Http::timeout(10)->get($large);
-                if (!$resp->ok()) {
-                    continue;
-                }
-                Storage::put($path, $resp->body());
-                $saved++;
-            } catch (\Throwable $e) {
-                $this->warn('Failed to download Pixabay image: ' . $e->getMessage());
+            $dstImg = imagecreatetruecolor($resizedWidth, $resizedHeight);
+            if (! $dstImg) {
+                imagedestroy($srcImg);
+                $this->error('Failed to create destination image resource.');
+                return self::FAILURE;
             }
+
+            imagecopyresampled($dstImg, $srcImg, 0, 0, 0, 0, $resizedWidth, $resizedHeight, $width, $height);
+
+            if (! imagejpeg($dstImg, $tmpPath, 90)) {
+                imagedestroy($srcImg);
+                imagedestroy($dstImg);
+                $this->error('Failed to write resized JPEG to temp path.');
+                return self::FAILURE;
+            }
+
+            imagedestroy($srcImg);
+            imagedestroy($dstImg);
         }
 
-        $this->info("Downloaded {$saved} image(s) to storage/app/{$destDir}");
+        $labels = [];
+        $imageProperties = [];
+        $faces = [];
+        $textDetections = [];
+        $celebrities = [];
+
+        if ($rekognition->isAvailable()) {
+            $labels = $rekognition->detectLabels($tmpPath);
+            $imageProperties = $rekognition->detectImageProperties($tmpPath);
+            $faces = $rekognition->detectFaces($tmpPath);
+            $textDetections = $rekognition->detectText($tmpPath);
+            if ($withCelebrities) {
+                $celebrities = $rekognition->recognizeCelebrities($tmpPath);
+            }
+        } else {
+            $this->warn('AWS Rekognition SDK/credentials not available; analysis fields will be empty.');
+        }
+
+        $disk = Storage::disk('local'); // storage/app/private
+        if (! $disk->exists('images')) {
+            $disk->makeDirectory('images');
+        }
+
+        $manifestPath = 'images/manifest.json';
+        $payload = [
+            'generated_at' => date('c'),
+            'source_image' => [
+                'input' => $imagePath,
+                'absolute' => $absolute,
+            ],
+            'temp_image' => [
+                'path' => $tmpPath,
+                'width' => $resizedWidth,
+                'height' => $resizedHeight,
+            ],
+            'analysis' => [
+                'labels' => $labels,
+                'image_properties' => $imageProperties,
+                'faces' => $faces,
+                'text' => $textDetections,
+                'celebrities' => $celebrities,
+            ],
+        ];
+
+        $disk->put($manifestPath, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $this->info('Wrote temporary manifest to storage/app/private/' . $manifestPath);
+
+        return self::SUCCESS;
+    }
+
+    private function resolveImagePath(string $imagePath): string
+    {
+        if (str_starts_with($imagePath, DIRECTORY_SEPARATOR)) {
+            return $imagePath;
+        }
+
+        return base_path($imagePath);
     }
 }

@@ -7,77 +7,65 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-class PixabaySearch extends Command
+class PexelsSearch extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'app:pixabay-search
+    protected $signature = 'app:pexels-search
         {query* : Search terms}
-        {--image_type=photo}
-        {--orientation=}
-        {--order=popular}
-        {--safesearch=1}
         {--per_page=10}
         {--page=1}
-        {--category=}
-        {--no-console : Do not write JSON to stdout}';
+        {--orientation=}
+        {--no-console : Do not write per-image log lines}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Search Pixabay, download JPEGs, and merge tags into XMP dc:subject metadata';
+    protected $description = 'Search Pexels, download JPEGs, and merge keyword tags into XMP dc:subject metadata';
 
     public function handle(): int
     {
-        $key = (string) config('services.pixabay.key');
-        $baseUrl = (string) config('services.pixabay.base_url', 'https://pixabay.com/api/');
-        $timeout = (int) config('services.pixabay.timeout', 6);
+        $apiKey = (string) config('services.pexels.api_key');
+        $baseUrl = (string) config('services.pexels.base_url', 'https://api.pexels.com/v1');
+        $timeout = (int) config('services.pexels.timeout', 8);
 
-        if ($key === '') {
-            $this->error('PIXABAY_API_KEY not configured');
+        if ($apiKey === '') {
+            $this->error('PEXELS_API_KEY not configured');
             return self::FAILURE;
         }
 
-        $q = trim(implode(' ', (array) $this->argument('query')));
-        if ($q === '') {
+        $query = trim(implode(' ', (array) $this->argument('query')));
+        if ($query === '') {
             $this->error('Empty query');
             return self::FAILURE;
         }
 
         $params = [
-            'key' => $key,
-            'q' => $q,
-            'image_type' => (string) $this->option('image_type'),
-            'orientation' => (string) ($this->option('orientation') ?: ''),
-            'order' => (string) $this->option('order'),
-            'safesearch' => (string) $this->option('safesearch'),
+            'query' => $query,
             'per_page' => (int) $this->option('per_page'),
             'page' => (int) $this->option('page'),
-            'category' => (string) ($this->option('category') ?: ''),
         ];
-
-        // Remove empty optional params
-        $params = array_filter($params, static function ($v) {
-            return !($v === '' || $v === null);
-        });
+        $orientation = (string) $this->option('orientation');
+        if ($orientation !== '') {
+            $params['orientation'] = $orientation;
+        }
 
         $writeConsole = ! (bool) $this->option('no-console');
 
-        // Build run-specific directory name under storage/app/private/images/pixabay
-        $slug = Str::slug($q, '-');
+        $slug = Str::slug($query, '-');
         if ($slug === '') {
-            $slug = 'pixabay-query';
+            $slug = 'pexels-query';
         }
         $timestamp = date('Ymd_His');
-        $baseDirectory = 'images/pixabay';
+        $baseDirectory = 'images/pexels';
         $runDirectory = $baseDirectory . '/' . $slug . '-' . $timestamp;
 
-        $disk = Storage::disk('local'); // maps to storage/app/private
+        $disk = Storage::disk('local'); // storage/app/private
         if (! $disk->exists($baseDirectory)) {
             $disk->makeDirectory($baseDirectory);
         }
@@ -86,35 +74,37 @@ class PixabaySearch extends Command
         }
 
         try {
-            $resp = Http::timeout($timeout)->get($baseUrl, $params);
+            $url = rtrim($baseUrl, '/') . '/search';
+            $resp = Http::timeout($timeout)
+                ->withHeaders([
+                    'Authorization' => $apiKey,
+                ])
+                ->get($url, $params);
+
             if (! $resp->ok()) {
-                throw new \RuntimeException('Pixabay API error, status ' . $resp->status());
+                throw new \RuntimeException('Pexels API error, status ' . $resp->status());
             }
 
             $decoded = $resp->json();
             if (! is_array($decoded)) {
-                throw new \RuntimeException('Pixabay response is not valid JSON.');
+                throw new \RuntimeException('Pexels response is not valid JSON.');
             }
 
-            $hits = $decoded['hits'] ?? [];
-            if (! is_array($hits)) {
-                throw new \RuntimeException('Pixabay response did not contain a hits array.');
-            }
-
-            if ($hits === []) {
+            $photos = $decoded['photos'] ?? [];
+            if (! is_array($photos) || $photos === []) {
                 if ($writeConsole) {
-                    $this->info('No Pixabay results for query: ' . $q);
+                    $this->info('No Pexels results for query: ' . $query);
                 }
                 return self::SUCCESS;
             }
 
             $savedCount = 0;
-            foreach ($hits as $hit) {
-                if (! is_array($hit)) {
+            foreach ($photos as $photo) {
+                if (! is_array($photo)) {
                     continue;
                 }
 
-                $this->downloadAndTagImage($hit, $disk, $runDirectory, $writeConsole);
+                $this->downloadAndTagImage($photo, $disk, $runDirectory, $writeConsole);
                 $savedCount++;
             }
 
@@ -124,59 +114,67 @@ class PixabaySearch extends Command
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error('Pixabay search failed: ' . $e->getMessage());
+            $this->error('Pexels search failed: ' . $e->getMessage());
             return self::FAILURE;
         }
     }
 
     /**
-     * Download a single Pixabay JPEG and merge its tags into XMP dc:subject.
+     * Download a single Pexels JPEG (src.original) and write its alt text into XMP dc:subject.
      *
-     * @param array<string,mixed> $hit
+     * @param array<string,mixed> $photo
      * @throws \RuntimeException
      */
-    private function downloadAndTagImage(array $hit, $disk, string $runDirectory, bool $writeConsole): void
+    private function downloadAndTagImage(array $photo, $disk, string $runDirectory, bool $writeConsole): void
     {
-        $id = (string) ($hit['id'] ?? '');
-        $tags = (string) ($hit['tags'] ?? '');
-        $large = (string) ($hit['largeImageURL'] ?? ($hit['webformatURL'] ?? ''));
+        $id = (string) ($photo['id'] ?? '');
 
-        if ($large === '') {
-            throw new \RuntimeException('Missing largeImageURL/webformatURL for hit ' . ($id !== '' ? $id : '[unknown id]'));
+        $src = $photo['src'] ?? [];
+        $imageUrl = null;
+        if (is_array($src)) {
+            $imageUrl = (string) ($src['original'] ?? $src['large2x'] ?? $src['large'] ?? '');
+        }
+        if ($imageUrl === null || $imageUrl === '') {
+            throw new \RuntimeException('Missing image URL for Pexels photo ' . ($id !== '' ? $id : '[unknown id]'));
         }
 
-        $pathPart = (string) parse_url($large, PHP_URL_PATH);
+        $altText = '';
+        if (! empty($photo['alt']) && is_string($photo['alt'])) {
+            $altText = trim((string) $photo['alt']);
+        }
+
+        $pathPart = (string) parse_url($imageUrl, PHP_URL_PATH);
         $ext = strtolower(pathinfo($pathPart, PATHINFO_EXTENSION) ?: 'jpg');
         if (! in_array($ext, ['jpg', 'jpeg', 'jpe'], true)) {
-            throw new \RuntimeException('Non-JPEG image for hit ' . $id . ' (' . $large . ')');
+            $ext = 'jpg';
         }
 
-        $baseName = $id !== '' ? 'pixabay-' . $id : 'pixabay-' . md5($large);
+        $baseName = $id !== '' ? 'pexels-' . $id : 'pexels-' . md5($imageUrl);
         $relativePath = rtrim($runDirectory, '/') . '/' . $baseName . '.' . $ext;
 
-        $resp = Http::timeout(20)->get($large);
+        $resp = Http::timeout(20)->get($imageUrl);
         if (! $resp->ok()) {
-            throw new \RuntimeException('Failed to download image for hit ' . $id . '. Status ' . $resp->status());
+            throw new \RuntimeException('Failed to download image for Pexels photo ' . $id . '. Status ' . $resp->status());
         }
 
-        // Save the original JPEG bytes as returned by Pixabay.
         $disk->put($relativePath, $resp->body());
         $absolutePath = $disk->path($relativePath);
 
-        // Embed tags into XMP dc:subject while preserving pixel data and other metadata.
-        $this->embedTagsIntoJpeg($absolutePath, $tags);
+        if ($altText !== '') {
+            $this->embedAltIntoJpegXmp($absolutePath, $altText);
+        }
 
         if ($writeConsole) {
-            $this->info('Saved image for hit ' . $id . ' to storage/app/private/' . $relativePath);
+            $this->info('Saved image for Pexels photo ' . $id . ' to storage/app/private/' . $relativePath);
         }
     }
 
     /**
-     * Embed tags into a JPEG's XMP dc:subject bag, preserving other metadata and pixel data.
+     * Embed a single alt text string into a JPEG's XMP dc:description field, preserving other metadata and pixels.
      *
      * @throws \RuntimeException
      */
-    private function embedTagsIntoJpeg(string $path, string $tagsString): void
+    private function embedAltIntoJpegXmp(string $path, string $altText): void
     {
         if (! is_file($path)) {
             throw new \RuntimeException('JPEG file not found: ' . $path);
@@ -195,11 +193,7 @@ class PixabaySearch extends Command
             throw new \RuntimeException('File does not appear to be a valid JPEG: ' . $path);
         }
 
-        $tags = $this->normalizeTags($tagsString);
-        if ($tags === []) {
-            // Nothing to add; keep file as-is.
-            return;
-        }
+        $tags = [$altText];
 
         $updated = $this->updateJpegXmpDcSubject($data, $tags);
 
@@ -209,27 +203,7 @@ class PixabaySearch extends Command
     }
 
     /**
-     * Normalize raw comma-separated Pixabay tags into a unique list.
-     *
-     * @return array<int,string>
-     */
-    private function normalizeTags(string $tagsString): array
-    {
-        $parts = array_map('trim', explode(',', $tagsString));
-        $out = [];
-        foreach ($parts as $tag) {
-            if ($tag === '') {
-                continue;
-            }
-            $key = mb_strtolower($tag);
-            $out[$key] = $tag;
-        }
-
-        return array_values($out);
-    }
-
-    /**
-     * Update or insert an XMP packet with dc:subject bag merged with $tags.
+     * Update or insert an XMP packet with dc:description merged with the given tags.
      * Returns full JPEG binary with pixel data preserved.
      *
      * @param array<int,string> $tags
@@ -287,7 +261,7 @@ class PixabaySearch extends Command
         }
 
         // Merge or create XMP XML
-        $newXmpXml = $this->mergeXmpDcSubjectXml($existingXmpXml, $tags);
+        $newXmpXml = $this->mergeXmpDcDescriptionXml($existingXmpXml, $tags);
         $newXmpSegmentData = $xmpHeader . $newXmpXml;
 
         if ($xmpIndex === null) {
@@ -320,11 +294,11 @@ class PixabaySearch extends Command
     }
 
     /**
-     * Merge tags into an XMP packet's dc:subject bag.
+     * Merge tags into an XMP packet's dc:description.
      *
      * @param array<int,string> $tags
      */
-    private function mergeXmpDcSubjectXml(?string $existingXml, array $tags): string
+    private function mergeXmpDcDescriptionXml(?string $existingXml, array $tags): string
     {
         $dom = new \DOMDocument('1.0', 'UTF-8');
         $dom->preserveWhiteSpace = false;
@@ -351,42 +325,29 @@ class PixabaySearch extends Command
         $xpath->registerNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
         $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
 
-        $subject = $xpath->query('.//dc:subject', $description)->item(0);
-        if (! $subject instanceof \DOMElement) {
-            $subject = $dom->createElementNS('http://purl.org/dc/elements/1.1/', 'dc:subject');
-            $description->appendChild($subject);
-        }
-
-        $bag = null;
-        foreach ($subject->childNodes as $child) {
-            if ($child instanceof \DOMElement && $child->localName === 'Bag') {
-                $bag = $child;
+        // We only care about the first tag (alt text) for description.
+        $text = '';
+        foreach ($tags as $tag) {
+            if ((string) $tag !== '') {
+                $text = (string) $tag;
                 break;
             }
         }
-        if (! $bag instanceof \DOMElement) {
-            $bag = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:Bag');
-            $subject->appendChild($bag);
+
+        if ($text === '') {
+            return $existingXml ?? ($dom->saveXML($dom->documentElement) ?: '');
         }
 
-        // Existing keywords in dc:subject bag
-        $existing = [];
-        foreach ($bag->getElementsByTagName('li') as $li) {
-            $val = (string) $li->nodeValue;
-            if ($val === '') {
-                continue;
+        $descNode = $xpath->query('.//dc:description', $description)->item(0);
+        if (! $descNode instanceof \DOMElement) {
+            $descNode = $dom->createElementNS('http://purl.org/dc/elements/1.1/', 'dc:description', $text);
+            $description->appendChild($descNode);
+        } elseif (trim((string) $descNode->nodeValue) === '') {
+            // Only set if there is no existing description text.
+            while ($descNode->firstChild) {
+                $descNode->removeChild($descNode->firstChild);
             }
-            $key = mb_strtolower($val);
-            $existing[$key] = true;
-        }
-
-        foreach ($tags as $tag) {
-            $key = mb_strtolower($tag);
-            if (isset($existing[$key])) {
-                continue;
-            }
-            $li = $dom->createElementNS('http://www.w3.org/1999/02/22-rdf-syntax-ns#', 'rdf:li', $tag);
-            $bag->appendChild($li);
+            $descNode->appendChild($dom->createTextNode($text));
         }
 
         return $dom->saveXML($dom->documentElement) ?: '';

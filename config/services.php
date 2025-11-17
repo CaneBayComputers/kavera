@@ -56,6 +56,18 @@ return [
         'timeout' => env('PIXABAY_TIMEOUT', 6),
     ],
 
+    'unsplash' => [
+        'access_key' => env('UNSPLASH_ACCESS_KEY'),
+        'base_url' => env('UNSPLASH_BASE_URL', 'https://api.unsplash.com'),
+        'timeout' => env('UNSPLASH_TIMEOUT', 8),
+    ],
+
+    'pexels' => [
+        'api_key' => env('PEXELS_API_KEY'),
+        'base_url' => env('PEXELS_BASE_URL', 'https://api.pexels.com/v1'),
+        'timeout' => env('PEXELS_TIMEOUT', 8),
+    ],
+
     'rekognition' => [
         // Uses standard AWS_* envs for credentials
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
