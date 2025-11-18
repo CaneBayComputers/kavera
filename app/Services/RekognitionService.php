@@ -239,46 +239,6 @@ class RekognitionService
         }
     }
 
-    /**
-     * Recognize celebrities in the image and return basic match information.
-     *
-     * @return array<int,array<string,mixed>>
-     */
-    public function recognizeCelebrities(string $absolutePath): array
-    {
-        $client = $this->makeClient();
-        if ($client === null || ! is_file($absolutePath)) {
-            return [];
-        }
-
-        try {
-            $bytes = file_get_contents($absolutePath);
-            if ($bytes === false) {
-                return [];
-            }
-
-            $result = $client->recognizeCelebrities([
-                'Image' => ['Bytes' => $bytes],
-            ]);
-
-            $faces = $result['CelebrityFaces'] ?? [];
-            $out = [];
-            foreach ($faces as $face) {
-                $out[] = [
-                    'name' => $face['Name'] ?? null,
-                    'id' => $face['Id'] ?? null,
-                    'urls' => $face['Urls'] ?? [],
-                    'match_confidence' => $face['MatchConfidence'] ?? null,
-                    'face' => $face['Face'] ?? null,
-                ];
-            }
-
-            return $out;
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
     private function makeClient(): ?\Aws\Rekognition\RekognitionClient
     {
         if (! $this->isAvailable()) {
