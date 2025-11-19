@@ -88,19 +88,141 @@ utility classes.
 
 ---
 
-### Image‑Driven Page Scaffolding
+### Image Ingest, Optimization & Manifest Pipeline
 
-Agents can bootstrap pages from images dropped into `storage/app/public/images` using lightweight conventions and an optional manifest. This helps rapidly assemble hero banners, feature cards, galleries, and team sections. Use Laravel's built-in `Storage::url()` helper.
+Agents should treat images as a first‑class data source for page generation. This repo now ships with a full ingest + analysis pipeline that collects images from providers, runs AWS Rekognition, optimizes assets, and builds an AI‑friendly manifest.
 
-- Filename hints (fallback parsing)
-  - Suggested pattern: `<page>-<section>-<role>-<order>.<ext>` (e.g., `home-hero-banner-1.jpg`, `services-card-webdev-1.png`).
-  - Role heuristics: hero/banner (very wide), card/feature (rectangular), headshot/logo (square), gallery (default).
+**1) Where images live**
 
-- Image manifest yaml
-  - Create `storage/app/private/images-manifest.yaml` describing sections, order, alt text, captions, and placement hints.
-  - This will also provide image visual hint details key words optionally provided by AWS Rekognition.
-  - The manifest is intended for the AI agent to read during generation; Blade templates do not read it at runtime.
-  - Agent generates `resources/views/content/<page>.blade.php` with sections: hero, features/cards grid, gallery, and optional team/logos, embedding chosen images and alt text based on structured data for each image found in the yaml file.
+- Private originals are stored under `storage/app/private/images` in these provider folders:
+  - `pexels/`, `pixabay/`, `unsplash/`, and `user/`.
+- Provider folders:
+  - Each search run is saved into a subfolder named after the original query terms, e.g. `storage/app/private/images/pixabay/sports-car-night-20251119_151633/...`.
+  - The subfolder name (minus trailing timestamp tokens) becomes `original_query_terms` for those images.
+- User folder:
+  - `storage/app/private/images/user` may contain loose images and `.zip` files.
+  - `.zip` files are extracted into a `_zip_<uuid>` subfolder, then deleted; the extracted folder structure is kept to hint at intended usage.
+
+**2) Provider import commands**
+
+- Pixabay search and download:
+  - `php artisan app:pixabay-search "<search terms...>"`
+  - Writes JPEGs into `storage/app/private/images/pixabay/<slug-timestamp>/...` and merges Pixabay tags into JPEG XMP (keywords/subjects) where possible.
+- Pexels search:
+  - `php artisan app:pexels-search "<search terms...>"`
+  - Saves Pexels images under `storage/app/private/images/pexels/<slug-timestamp>/...` and stores the Pexels `alt` text into XMP dc:description when available.
+- Unsplash search:
+  - `php artisan app:unsplash-search "<search terms...>"`
+  - Saves Unsplash images under `storage/app/private/images/unsplash/<slug-timestamp>/...` and embeds a combined description `(description + alt_description)` into XMP dc:description when present.
+
+**3) Building the image manifest**
+
+- Main command:
+
+  ```bash
+  php artisan app:images-manifest
+  # Use --force to re‑run Rekognition and re‑generate WebP files even if entries already exist
+  # php artisan app:images-manifest --force
+  ```
+
+- What it scans:
+  - Recursively walks `storage/app/private/images/{pexels,pixabay,unsplash,user}`.
+  - Skips unsupported formats and `*.svg` files.
+  - For `user`:
+    - Detects `.zip` archives, extracts them once into `_zip_<uuid>` folders, deletes the original `.zip`, and processes all extracted images.
+
+**4) Rekognition analysis**
+
+- For each image:
+  - Creates a temporary JPEG with a max long side of `1280px` (never upscaling) and sends that to AWS Rekognition.
+  - Uses `RekognitionService` for `detectLabels`, `detectImageProperties`, `detectFaces`, and `detectText`.
+- The condensed Rekognition output is stored per image under:
+
+  ```json
+  "auto_identified_properties_from_aws_rekognition": {
+      "objects": ["Label1", "Label2", "..."],
+      "brightness": "NN%",
+      "sharpness": "NN%",
+      "contrast": "NN%",
+      "dominant_colors": ["color phrase 1", "color phrase 2", "..."],
+      "number_of_human_faces": 0,
+      "text_segments": ["TEXT1", "TEXT2", "..."]
+  }
+  ```
+
+- Ordering & thresholds:
+  - `objects` are Rekog labels sorted by confidence (highest first).
+  - `dominant_colors` are derived from Rekognition’s dominant color data and converted into human‑readable phrases (including grays, white/black, brown, magenta, etc.).
+  - `text_segments` are unique, high‑confidence (>95%) text detections sorted by confidence.
+
+**5) WebP optimization & URLs**
+
+- For each original:
+  - If the longest side is `< 480px`:
+    - Generates a single WebP at original size under `storage/app/public/images/optimized/small/{id}`.
+    - `available_sizes` will contain the original long‑side value (e.g. `[420]`).
+  - Otherwise:
+    - Generates WebP variants at up to `1920`, `1280`, `768`, and `480` pixels on the long side (never upscaling).
+    - Landscape: target is width; portrait: target is height.
+    - Each variant is saved under `storage/app/public/images/optimized/{size}/{id}`.
+- Filenames & idempotency:
+  - `hash = sha1(original file bytes)`.
+  - `id = "<hash>.webp"` is used for all optimized variants and as the per‑image manifest id.
+  - If manifest entry + optimized files already exist for a given hash, the command skips reprocessing unless `--force` is provided.
+- Public URLs:
+  - For any manifest entry:
+
+    ```text
+    /images/optimized/{available_size}/{id}
+    ```
+
+    where `{available_size}` is one of the sizes listed in `available_sizes` (or `small` for very small originals).
+
+**6) Manifest structure (AI‑facing)**
+
+- Manifest file:
+  - Location: `storage/app/private/images/manifest.json`.
+  - Shape:
+
+    ```json
+    {
+      "notes": [
+        "Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).",
+        "Use and utilize all pictures where provider = 'user'.",
+        "Adhere to any user image directory structure and file naming to infer intended page usage.",
+        "Public image URLs are /images/optimized/{available_size}/{id}."
+      ],
+      "images": [
+        {
+          "id": "<sha1>.webp",
+          "hash": "<sha1_of_original>",
+          "provider": "pexels|pixabay|unsplash|user",
+          "original_path": "relative/path/under/provider.ext",
+          "orientation": "landscape|portrait|square|banner",
+          "aspect_ratio": 1.5,
+          "original_query_terms": ["sports", "car", "night"],
+          "provider_keywords": [...],
+          "provider_description": "..." | null,
+          "auto_identified_properties_from_aws_rekognition": { ... },
+          "available_sizes": [1920, 1280, 768, 480] // or subset / small-only
+        }
+      ]
+    }
+    ```
+
+- Provider‑specific behavior:
+  - `original_path` is always relative to `storage/app/private/images/{provider}/` (no absolute paths or provider root).
+  - For `pexels`, `pixabay`, and `unsplash`:
+    - `original_query_terms` are derived from the search folder name with trailing timestamp‑like tokens stripped.
+    - `provider_keywords`/`provider_description` are populated from provider metadata where available (e.g. Pixabay description, Pexels/Unsplash search terms and captions).
+  - `user` images:
+    - `original_query_terms` is an empty array; rely on folder structure + Rekog fields and any embedded metadata for semantic hints.
+
+- Intent:
+  - The manifest is not read by Blade at runtime; it exists for AI agents and build tooling to:
+    - Discover all available images (especially in `user/`).
+    - Understand orientation, color feel, objects, text, and confidence ordering.
+    - Map images to page sections using folder structure, query terms, and Rekog output when generating or refactoring content templates.
 
 
 ---

@@ -146,11 +146,23 @@ class BuildImageManifest extends Command
             $sharpness = $quality['sharpness'] ?? null;
             $contrast = $quality['contrast'] ?? null;
         }
-        if (! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
-            foreach ($imageProperties['full']['dominant_colors'] as $color) {
+        // Prefer foreground/background dominant colors for palette; fall back to full if needed.
+        $colorSets = [];
+        if (! empty($imageProperties['foreground']['dominant_colors']) && is_array($imageProperties['foreground']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['foreground']['dominant_colors'];
+        }
+        if (! empty($imageProperties['background']['dominant_colors']) && is_array($imageProperties['background']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['background']['dominant_colors'];
+        }
+        if (empty($colorSets) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['full']['dominant_colors'];
+        }
+
+        foreach ($colorSets as $set) {
+            foreach ($set as $color) {
                 $hex = (string) ($color['hex'] ?? '');
                 if ($hex !== '') {
-                    $colors[] = $hex;
+                    $colors[] = $this->describeColor($hex);
                 }
             }
         }
@@ -164,6 +176,11 @@ class BuildImageManifest extends Command
             });
             $seenText = [];
             foreach ($textDetections as $det) {
+                $confidence = (float) ($det['confidence'] ?? 0);
+                if ($confidence < 95.0) {
+                    continue; // require high confidence for text
+                }
+
                 $text = trim((string) ($det['text'] ?? ''));
                 if ($text === '') {
                     continue;
@@ -186,9 +203,9 @@ class BuildImageManifest extends Command
         $payload = [
             'auto_identified_properties_from_aws_rekognition' => [
                 'objects' => $objects,
-                'brightness' => $brightness,
-                'sharpness' => $sharpness,
-                'contrast' => $contrast,
+                'brightness' => $this->toPercent($brightness),
+                'sharpness' => $this->toPercent($sharpness),
+                'contrast' => $this->toPercent($contrast),
                 'dominant_colors' => $colors,
                 'faces' => $facesCount,
                 'text_segments' => $textSegments,
@@ -221,10 +238,10 @@ class BuildImageManifest extends Command
         $providers = ['pexels', 'pixabay', 'unsplash', 'user'];
 
         $state = $this->loadManifestState();
-        $imagesById = [];
+        $imagesByHash = [];
         foreach ($state['images'] as $index => $entry) {
-            if (! empty($entry['id'])) {
-                $imagesById[$entry['id']] = $index;
+            if (! empty($entry['hash'])) {
+                $imagesByHash[$entry['hash']] = $index;
             }
         }
 
@@ -237,9 +254,9 @@ class BuildImageManifest extends Command
             }
 
             if ($provider === 'user') {
-                $this->processUserFolder($providerDir, $provider, $rekognition, $force, $state, $imagesById, $processed);
+                $this->processUserFolder($providerDir, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
             } else {
-                $this->processProviderFolder($providerDir, $provider, $rekognition, $force, $state, $imagesById, $processed);
+                $this->processProviderFolder($providerDir, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
             }
         }
 
@@ -250,7 +267,7 @@ class BuildImageManifest extends Command
         return self::SUCCESS;
     }
 
-    private function processProviderFolder(string $providerDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesById, int &$processed): void
+    private function processProviderFolder(string $providerDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
     {
         $dirIterator = new \RecursiveDirectoryIterator($providerDir, \FilesystemIterator::SKIP_DOTS);
         $iterator = new \RecursiveIteratorIterator($dirIterator);
@@ -271,11 +288,11 @@ class BuildImageManifest extends Command
             $searchFolder = $parts[0] ?? '';
             $originalKeyTerms = $this->parseKeyTermsFromFolder($searchFolder);
 
-            $this->processImageForManifest($provider, $absolute, $originalKeyTerms, $rekognition, $force, $state, $imagesById, $processed);
+            $this->processImageForManifest($provider, $absolute, $originalKeyTerms, $rekognition, $force, $state, $imagesByHash, $processed);
         }
     }
 
-    private function processUserFolder(string $userDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesById, int &$processed): void
+    private function processUserFolder(string $userDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
     {
         $dirIterator = new \RecursiveDirectoryIterator($userDir, \FilesystemIterator::SKIP_DOTS);
         $iterator = new \RecursiveIteratorIterator($dirIterator, \RecursiveIteratorIterator::SELF_FIRST);
@@ -289,7 +306,7 @@ class BuildImageManifest extends Command
             $ext = strtolower(pathinfo($absolute, PATHINFO_EXTENSION));
 
             if ($ext === 'zip') {
-                $this->extractAndProcessZip($absolute, $provider, $rekognition, $force, $state, $imagesById, $processed);
+                $this->extractAndProcessZip($absolute, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
                 // Delete original zip after extraction as requested.
                 @unlink($absolute);
                 continue;
@@ -299,11 +316,11 @@ class BuildImageManifest extends Command
                 continue;
             }
 
-            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesById, $processed);
+            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesByHash, $processed);
         }
     }
 
-    private function extractAndProcessZip(string $zipPath, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesById, int &$processed): void
+    private function extractAndProcessZip(string $zipPath, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
     {
         $zip = new \ZipArchive();
         if ($zip->open($zipPath) !== true) {
@@ -335,11 +352,8 @@ class BuildImageManifest extends Command
             if (! $this->isSupportedImageExtension($absolute)) {
                 continue;
             }
-            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesById, $processed);
+            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesByHash, $processed);
         }
-
-        // Clean up extracted files
-        $this->deleteDirectoryRecursive($tmpDir);
     }
 
     private function isSupportedImageExtension(string $path): bool
@@ -351,7 +365,7 @@ class BuildImageManifest extends Command
 
         $supported = [
             'jpg', 'jpeg', 'jpe', 'png', 'gif', 'bmp', 'tif', 'tiff', 'webp',
-            'heic', 'heif', 'pdf', 'eps', 'ai', 'psd'
+            'heic', 'heif', 'pdf', 'eps', 'ai', 'psd', 'avif'
         ];
 
         return in_array($ext, $supported, true);
@@ -369,23 +383,24 @@ class BuildImageManifest extends Command
         return array_values($parts);
     }
 
-    private function processImageForManifest(string $provider, string $absolutePath, array $originalKeyTerms, RekognitionService $rekognition, bool $force, array &$state, array &$imagesById, int &$processed): void
+    private function processImageForManifest(string $provider, string $absolutePath, array $originalKeyTerms, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
     {
         if (! is_file($absolutePath)) {
             return;
         }
 
-        $id = @sha1_file($absolutePath) ?: sha1($absolutePath);
-        $existing = $imagesById[$id] ?? null;
+        $hash = @sha1_file($absolutePath) ?: sha1($absolutePath);
+        $existing = $imagesByHash[$hash] ?? null;
 
         // Idempotency: if entry and optimized files exist and not forced, skip.
         if (! $force && $existing !== null) {
             $entry = $state['images'][$existing] ?? null;
-            if (is_array($entry) && ! empty($entry['image_location']['name_id']) && ! empty($entry['image_location']['sizes']) && is_array($entry['image_location']['sizes'])) {
-                $nameId = (string) $entry['image_location']['name_id'];
+            if (is_array($entry) && ! empty($entry['id']) && ! empty($entry['available_sizes']) && is_array($entry['available_sizes'])) {
+                $nameId = (string) $entry['id'];
                 $allSizesPresent = true;
-                foreach ($entry['image_location']['sizes'] as $size) {
-                    $optPath = storage_path('app/public/images/optimized/' . $size . '/' . $nameId);
+                foreach ($entry['available_sizes'] as $size) {
+                    $folder = $size < 480 ? 'small' : (string) $size;
+                    $optPath = storage_path('app/public/images/optimized/' . $folder . '/' . $nameId);
                     if (! is_file($optPath)) {
                         $allSizesPresent = false;
                         break;
@@ -437,33 +452,46 @@ class BuildImageManifest extends Command
                 $keywords[mb_strtolower($t)] = $t;
             }
         }
-        $finalKeywords = array_values($keywords);
-
         // TODO: read existing EXIF/IPTC/XMP keywords and merge; for now we rely on provider terms + Rekog.
 
-        // Generate WebP variants
-        [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height);
+        // Generate WebP variants; use the content hash as the stable file name
+        [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
+
+        // Provider-specific metadata fields
+        $originalQueryTerms = $provider === 'user' ? [] : array_values($originalKeyTerms);
+        // Drop trailing timestamp-like segments (e.g., 20251119 151633)
+        $originalQueryTerms = $this->stripTimestampTerms($originalQueryTerms);
+        $providerKeywords = [];
+        $providerDescription = null;
+
+        if ($provider === 'pexels' || $provider === 'unsplash') {
+            $providerKeywords = $originalQueryTerms;
+        } elseif ($provider === 'pixabay') {
+            $providerDescription = implode(' ', $originalQueryTerms);
+        }
+
+        // Relative original path under provider folder
+        $relPath = $this->relativeOriginalPath($provider, $absolutePath);
 
         $entry = [
-            'id' => $id,
+            'id' => $imageLocationNameId,
+            'hash' => $hash,
             'provider' => $provider,
-            'original_path' => $absolutePath,
+            'original_path' => $relPath,
             'orientation' => $orientation,
             'aspect_ratio' => $aspect,
-            'original_key_terms' => array_values($originalKeyTerms),
-            'final_keywords' => $finalKeywords,
+            'original_query_terms' => $originalQueryTerms,
+            'provider_keywords' => $providerKeywords,
+            'provider_description' => $providerDescription,
             'auto_identified_properties_from_aws_rekognition' => $autoProps,
-            'image_location' => [
-                'name_id' => $imageLocationNameId,
-                'sizes' => $sizes,
-            ],
+            'available_sizes' => $sizes,
         ];
 
         if ($existing !== null) {
             $state['images'][$existing] = $entry;
         } else {
             $state['images'][] = $entry;
-            $imagesById[$id] = count($state['images']) - 1;
+            $imagesByHash[$hash] = count($state['images']) - 1;
         }
 
         $processed++;
@@ -492,13 +520,13 @@ class BuildImageManifest extends Command
     private function createTempJpegForRekognition(string $absolutePath, int $maxLongSide): ?string
     {
         $contents = @file_get_contents($absolutePath);
-        if ($contents === false) {
-            return null;
-        }
+        $src = $contents !== false ? @imagecreatefromstring($contents) : false;
 
-        $src = @imagecreatefromstring($contents);
         if (! $src) {
-            return null;
+            // Fallback: use ImageMagick convert directly to make a JPEG resized to maxLongSide.
+            $tmpPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . Str::uuid()->toString() . '.jpg';
+            $this->convertWithImagickLike($absolutePath, $tmpPath, $maxLongSide, $maxLongSide, true);
+            return is_file($tmpPath) ? $tmpPath : null;
         }
 
         $width = imagesx($src);
@@ -572,11 +600,23 @@ class BuildImageManifest extends Command
             $sharpness = $quality['sharpness'] ?? null;
             $contrast = $quality['contrast'] ?? null;
         }
-        if (! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
-            foreach ($imageProperties['full']['dominant_colors'] as $color) {
+        // Prefer foreground/background dominant colors for palette; fall back to full if needed.
+        $colorSets = [];
+        if (! empty($imageProperties['foreground']['dominant_colors']) && is_array($imageProperties['foreground']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['foreground']['dominant_colors'];
+        }
+        if (! empty($imageProperties['background']['dominant_colors']) && is_array($imageProperties['background']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['background']['dominant_colors'];
+        }
+        if (empty($colorSets) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
+            $colorSets[] = $imageProperties['full']['dominant_colors'];
+        }
+
+        foreach ($colorSets as $set) {
+            foreach ($set as $color) {
                 $hex = (string) ($color['hex'] ?? '');
                 if ($hex !== '') {
-                    $colors[] = $hex;
+                    $colors[] = $this->describeColor($hex);
                 }
             }
         }
@@ -590,6 +630,11 @@ class BuildImageManifest extends Command
             });
             $seenText = [];
             foreach ($textDetections as $det) {
+                $confidence = (float) ($det['confidence'] ?? 0);
+                if ($confidence < 95.0) {
+                    continue; // require high confidence for text
+                }
+
                 $text = trim((string) ($det['text'] ?? ''));
                 if ($text === '') {
                     continue;
@@ -605,67 +650,298 @@ class BuildImageManifest extends Command
 
         return [
             'objects' => $objects,
-            'brightness' => $brightness,
-            'sharpness' => $sharpness,
-            'contrast' => $contrast,
+            'brightness' => $this->toPercent($brightness),
+            'sharpness' => $this->toPercent($sharpness),
+            'contrast' => $this->toPercent($contrast),
             'dominant_colors' => $colors,
-            'faces' => $facesCount,
+            'number_of_human_faces' => $facesCount,
             'text_segments' => $textSegments,
         ];
     }
 
-    private function generateWebpVariants(string $absolutePath, int $width, int $height): array
+    private function convertWithImagickLike(string $sourcePath, string $destPath, int $targetWidth, int $targetHeight, bool $scaleBox = false): void
     {
-        $contents = @file_get_contents($absolutePath);
-        if ($contents === false) {
-            return ['', []];
+        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+        $input = $sourcePath;
+
+        $multiFrameExts = [
+            'pdf', 'gif', 'webp', 'tiff', 'tif', 'ai', 'heic', 'heif', 'avif',
+            'jp2', 'j2k', 'jpf', 'jpx', 'ico', 'eps', 'psd',
+        ];
+        if (in_array($ext, $multiFrameExts, true)) {
+            $input .= '[0]';
         }
 
-        $src = @imagecreatefromstring($contents);
-        if (! $src) {
-            return ['', []];
+        $resizeArg = $scaleBox
+            ? sprintf('%dx%d>', $targetWidth, $targetHeight)
+            : sprintf('%dx%d>', $targetWidth, $targetHeight);
+
+        $cmd = [
+            '/usr/bin/convert',
+            escapeshellarg($input),
+            '-auto-orient',
+            '-quality',
+            '90',
+            '-resize',
+            escapeshellarg($resizeArg),
+            escapeshellarg($destPath),
+        ];
+
+        $command = implode(' ', $cmd);
+        exec($command);
+    }
+
+    private function toPercent($value): ?string
+    {
+        if (! is_numeric($value)) {
+            return null;
         }
+
+        $v = (int) round((float) $value);
+        if ($v < 0) {
+            $v = 0;
+        }
+        if ($v > 100) {
+            $v = 100;
+        }
+
+        return $v . '%';
+    }
+
+    private function describeColor(string $hex): string
+    {
+        $hex = ltrim($hex, '#');
+
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+
+        if (strlen($hex) !== 6) {
+            return $hex;
+        }
+
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+
+        $r_f = $r / 255;
+        $g_f = $g / 255;
+        $b_f = $b / 255;
+
+        $max = max($r_f, $g_f, $b_f);
+        $min = min($r_f, $g_f, $b_f);
+
+        $l = ($max + $min) / 2;
+
+        if ($max === $min) {
+            $h = 0;
+            $s = 0;
+        } else {
+            $d = $max - $min;
+
+            $s = $l > 0.5
+                ? $d / (2 - $max - $min)
+                : $d / ($max + $min);
+
+            if ($max === $r_f) {
+                $h = ($g_f - $b_f) / $d + ($g_f < $b_f ? 6 : 0);
+            } elseif ($max === $g_f) {
+                $h = ($b_f - $r_f) / $d + 2;
+            } else {
+                $h = ($r_f - $g_f) / $d + 4;
+            }
+
+            $h /= 6;
+        }
+
+        $hue_deg = $h * 360;
+
+        // Grayscale handling: very low saturation → shades of gray/white/black.
+        if ($s < 0.05) {
+            if ($l <= 0.08) {
+                return 'black';
+            }
+            if ($l <= 0.18) {
+                return 'near black';
+            }
+            if ($l <= 0.32) {
+                return 'dark gray';
+            }
+            if ($l <= 0.65) {
+                return 'gray';
+            }
+            if ($l <= 0.85) {
+                return 'light gray';
+            }
+            if ($l <= 0.95) {
+                return 'near white';
+            }
+            return 'white';
+        }
+
+        // Hue name including magenta and brown.
+        if ($hue_deg < 15 || $hue_deg >= 345) {
+            $hue_name = 'red';
+        } elseif ($hue_deg < 45) {
+            $hue_name = 'orange';
+        } elseif ($hue_deg < 75) {
+            $hue_name = 'yellow';
+        } elseif ($hue_deg < 150) {
+            $hue_name = 'green';
+        } elseif ($hue_deg < 210) {
+            $hue_name = 'cyan';
+        } elseif ($hue_deg < 270) {
+            $hue_name = 'blue';
+        } elseif ($hue_deg < 300) {
+            $hue_name = 'purple';
+        } elseif ($hue_deg < 345) {
+            $hue_name = 'magenta';
+        } else {
+            $hue_name = 'red';
+        }
+
+        // Override to brown when in the warm range with medium lightness.
+        if ($hue_deg >= 15 && $hue_deg <= 45 && $l >= 0.2 && $l <= 0.6) {
+            $hue_name = 'brown';
+        }
+
+        // Lightness descriptor.
+        if ($l < 0.15) {
+            $lightness = 'very dark';
+        } elseif ($l < 0.35) {
+            $lightness = 'dark';
+        } elseif ($l < 0.65) {
+            $lightness = '';
+        } elseif ($l < 0.85) {
+            $lightness = 'light';
+        } else {
+            $lightness = 'very light';
+        }
+
+        // Saturation descriptor.
+        if ($s < 0.15) {
+            $saturation = 'muted';
+        } elseif ($s < 0.35) {
+            $saturation = 'muted';
+        } elseif ($s < 0.70) {
+            $saturation = '';
+        } else {
+            $saturation = 'vibrant';
+        }
+
+        $parts = array_filter([$lightness, $saturation, $hue_name]);
+
+        return implode(' ', $parts);
+    }
+
+    private function generateWebpVariants(string $absolutePath, int $width, int $height, string $nameId): array
+    {
+        $contents = @file_get_contents($absolutePath);
+        $src = $contents !== false ? @imagecreatefromstring($contents) : false;
 
         $longSide = max($width, $height);
         $sizesToMake = [1920, 1280, 768, 480];
-        $nameId = Str::uuid()->toString() . '.webp';
         $generatedSizes = [];
 
-        foreach ($sizesToMake as $target) {
-            if ($longSide < $target) {
-                continue; // never upscale beyond original
-            }
+        // Very small originals: keep a single WebP at original size in a dedicated "small" folder.
+        if ($longSide < 480) {
+            if ($src) {
+                $targetWidth = $width;
+                $targetHeight = $height;
 
-            if ($width >= $height) {
-                $targetWidth = $target;
-                $targetHeight = (int) round($height * ($targetWidth / $width));
+                $dst = imagecreatetruecolor($targetWidth, $targetHeight);
+                if ($dst) {
+                    imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+
+                    $optDir = storage_path('app/public/images/optimized/small');
+                    if (is_dir($optDir) || mkdir($optDir, 0777, true) || is_dir($optDir)) {
+                        $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
+                        if (imagewebp($dst, $destPath, 80)) {
+                            $generatedSizes[] = $longSide; // actual max dimension
+                        }
+                    }
+                    imagedestroy($dst);
+                }
+
+                imagedestroy($src);
             } else {
-                $targetHeight = $target;
-                $targetWidth = (int) round($width * ($targetHeight / $height));
+                // Fallback: use ImageMagick convert to make a WebP at original size.
+                $optDir = storage_path('app/public/images/optimized/small');
+                if (is_dir($optDir) || mkdir($optDir, 0777, true) || is_dir($optDir)) {
+                    $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
+                    $this->convertWithImagickLike($absolutePath, $destPath, $width, $height);
+                    if (is_file($destPath)) {
+                        $generatedSizes[] = $longSide;
+                    }
+                }
             }
 
-            $dst = imagecreatetruecolor($targetWidth, $targetHeight);
-            if (! $dst) {
-                continue;
-            }
-
-            imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
-
-            $optDir = storage_path('app/public/images/optimized/' . $target);
-            if (! is_dir($optDir) && ! mkdir($optDir, 0777, true) && ! is_dir($optDir)) {
-                imagedestroy($dst);
-                continue;
-            }
-
-            $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
-            if (imagewebp($dst, $destPath, 80)) {
-                $generatedSizes[] = $target;
-            }
-
-            imagedestroy($dst);
+            return [$nameId, $generatedSizes];
         }
 
-        imagedestroy($src);
+        if ($src) {
+            foreach ($sizesToMake as $target) {
+                if ($longSide < $target) {
+                    continue; // never upscale beyond original
+                }
+
+                if ($width >= $height) {
+                    $targetWidth = $target;
+                    $targetHeight = (int) round($height * ($targetWidth / $width));
+                } else {
+                    $targetHeight = $target;
+                    $targetWidth = (int) round($width * ($targetHeight / $height));
+                }
+
+                $dst = imagecreatetruecolor($targetWidth, $targetHeight);
+                if (! $dst) {
+                    continue;
+                }
+
+                imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+
+                $optDir = storage_path('app/public/images/optimized/' . $target);
+                if (! is_dir($optDir) && ! mkdir($optDir, 0777, true) && ! is_dir($optDir)) {
+                    imagedestroy($dst);
+                    continue;
+                }
+
+                $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
+                if (imagewebp($dst, $destPath, 80)) {
+                    $generatedSizes[] = $target;
+                }
+
+                imagedestroy($dst);
+            }
+
+            imagedestroy($src);
+        } else {
+            // Fallback: use ImageMagick-like convert directly for each size.
+            foreach ($sizesToMake as $target) {
+                if ($longSide < $target) {
+                    continue;
+                }
+
+                if ($width >= $height) {
+                    $targetWidth = $target;
+                    $targetHeight = (int) round($height * ($targetWidth / $width));
+                } else {
+                    $targetHeight = $target;
+                    $targetWidth = (int) round($width * ($targetHeight / $height));
+                }
+
+                $optDir = storage_path('app/public/images/optimized/' . $target);
+                if (! is_dir($optDir) && ! mkdir($optDir, 0777, true) && ! is_dir($optDir)) {
+                    continue;
+                }
+
+                $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
+                $this->convertWithImagickLike($absolutePath, $destPath, $targetWidth, $targetHeight);
+                if (is_file($destPath)) {
+                    $generatedSizes[] = $target;
+                }
+            }
+        }
 
         return [$nameId, $generatedSizes];
     }
@@ -690,52 +966,82 @@ class BuildImageManifest extends Command
         @rmdir($dir);
     }
 
+    private function stripTimestampTerms(array $terms): array
+    {
+        $count = count($terms);
+        if ($count < 2) {
+            return $terms;
+        }
+
+        $last = $terms[$count - 1];
+        $secondLast = $terms[$count - 2];
+
+        $isNumericLike = static function ($value): bool {
+            $value = (string) $value;
+            return ctype_digit($value) && strlen($value) >= 4 && strlen($value) <= 8;
+        };
+
+        if ($isNumericLike($last) && $isNumericLike($secondLast)) {
+            return array_slice($terms, 0, $count - 2);
+        }
+
+        return $terms;
+    }
+
+    private function relativeOriginalPath(string $provider, string $absolutePath): string
+    {
+        $baseDir = storage_path('app/private/images/' . $provider . '/');
+        if (str_starts_with($absolutePath, $baseDir)) {
+            return ltrim(substr($absolutePath, strlen($baseDir)), DIRECTORY_SEPARATOR);
+        }
+
+        return basename($absolutePath);
+    }
+
     private function loadManifestState(): array
     {
         $disk = Storage::disk('local');
         $path = 'images/manifest.json';
 
+        $fresh = [
+            'notes' => [
+                'Rekognition objects, colors, and text appear in highest confidence order (index 0..N).',
+                "Use and utilize all pictures where provider = 'user'.",
+                'Adhere to any user image directory structure and file naming to infer intended page usage.',
+                'Public image URLs are /images/optimized/{available_size}/{id}.',
+            ],
+            'images' => [],
+        ];
+
         if (! $disk->exists($path)) {
-            return [
-                'notes' => [
-                    'Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).',
-                    "Use and utilize all pictures found in 'user' folder.",
-                ],
-                'images' => [],
-            ];
+            return $fresh;
         }
 
         $raw = $disk->get($path);
         $decoded = json_decode($raw, true);
         if (! is_array($decoded)) {
-            return [
-                'notes' => [
-                    'Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).',
-                    "Use and utilize all pictures found in 'user' folder.",
-                ],
-                'images' => [],
-            ];
+            return $fresh;
         }
 
-        // If legacy format (single analysis object), reset to new structure.
+        // Legacy single-analysis format
         if (array_key_exists('auto_identified_properties_from_aws_rekognition', $decoded)) {
-            return [
-                'notes' => [
-                    'Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).',
-                    "Use and utilize all pictures found in 'user' folder.",
-                ],
-                'images' => [],
-            ];
+            return $fresh;
         }
 
         if (! array_key_exists('notes', $decoded) || ! array_key_exists('images', $decoded) || ! is_array($decoded['images'])) {
-            $decoded = [
-                'notes' => [
-                    'Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).',
-                    "Use and utilize all pictures found in 'user' folder.",
-                ],
-                'images' => [],
-            ];
+            return $fresh;
+        }
+
+        // Older image entries (absolute original_path, final_keywords or image_location.sizes) → reset.
+        $images = $decoded['images'] ?? [];
+        $first = $images[0] ?? null;
+        if (is_array($first)) {
+            if (isset($first['final_keywords'])) {
+                return $fresh;
+            }
+            if (isset($first['image_location']['sizes'])) {
+                return $fresh;
+            }
         }
 
         return $decoded;
