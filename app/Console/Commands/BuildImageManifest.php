@@ -1142,7 +1142,7 @@ class BuildImageManifest extends Command
 
         $fresh = [
             'notes' => [
-                'Rekognition objects, colors, and text appear in highest significance order (index 0..N).',
+                'Rekognition objects and colors appear in order of prominance from most (index 0) to least (index N).',
                 "Prefer pictures where provider = 'user' and applicable to overall style and content.",
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
                 'Public image URLs are /storage/images/optimized/{available_size}/{id}.',

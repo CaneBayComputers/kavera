@@ -20,9 +20,7 @@ Get the idea? You’re not wiring a CMS. You’re shipping a site.
 
 Using Podium (recommended)
 ```bash
-podium clone https://github.com/CaneBayComputers/kavera.git
-cd ~/podium-projects/kavera
-podium art app:agent-brief
+php artisan app:agent-brief
 ```
 
 That’s it. Pages live in `resources/views/content`. Add or remove a page, then refresh the registry (see “Technical Reference”).
@@ -64,8 +62,8 @@ After this, edits under `resources/views` won’t affect the example set.
 
 ## 🤖 Agent Workflow (Fast Path)
 
-1) Drop images into `public/images/` (optional YAML manifest in `storage/app/images-manifest.yaml`).
-2) Run the Agent Brief wizard: `podium art app:agent-brief`.
+1) Drop images into `/storage/app/public/images`.
+2) Run the Agent Brief wizard: `php artisan app:agent-brief`.
 3) Let your agent scaffold pages and sections (hero, features, cards, galleries).
 4) Wire forms via simple config (email + webhooks).
 5) Flip on integrations with env keys. Done.
@@ -110,7 +108,7 @@ Setup and code examples live in AGENTS.md → “Webhook Adapters.”
 Run an interactive command to generate a project‑specific prompt that tells any AI agent exactly how to build out your site within Kavera on Laravel.
 
 ```bash
-podium art app:agent-brief
+php artisan app:agent-brief
 ```
 
 It collects pages, forms, tone, business info, and more, then prints a ready‑to‑paste brief.
@@ -143,8 +141,8 @@ BLOGGER_BLOG_ID=your_blog_id
 3) Import posts as Blade files and refresh the registry:
 
 ```bash
-script -q -c "podium art app:blogger-import --per_page=50" /dev/null
-script -q -c "podium art app:update-content-list" /dev/null
+php artisan app:blogger-import --per_page=50
+php artisan app:update-content-list
 ```
 
 4) View your blog at `/<base>` (default `/blog`). Labels and archives are available at `/<base>/<label-segment>/<label>` and `/<base>/<YYYY>/<MM>`.

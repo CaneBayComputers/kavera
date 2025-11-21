@@ -1,4 +1,4 @@
-## AI Agent Onboarding Protocol
+## AI Agent Onboarding
 
 ### Purpose
 
@@ -6,20 +6,7 @@ This section defines how any AI agent (e.g., Codex, Cursor, Aider, or GPT CLI) s
 
 ---
 
-### Initial Context Acquisition
-
-**Read the following files** in the given order to become acquainted with the project’s architecture, dependencies, and conventions:
-
-1. `README.md` – overall purpose, setup, and deployment notes
-2. `composer.json` – PHP dependencies and autoloading configuration
-3. `.env` – environment variables, active service settings and tech stack
-4. `app/helpers.php` – global helper functions and environment logic
-5. `resources/examples/content/index.blade.php` - meta tags and schema markup (json-ld) integration
-6. `routes/web.php` - Custom web URL routing for static pages, forms and "blog"
-
----
-
-### Project Overview
+### Framework Overview
 
 Kavera is a Laravel-based website framework that uses flat-file Blade templates
 for static pages and retrieves dynamic content from external services. Static
@@ -88,6 +75,96 @@ utility classes.
 
 ---
 
+### Agent Website Generation and Suggested User Input
+
+When a user says something like “make me a website” (without enough detail), agents **must not** immediately start editing files and copying the example site. Instead:
+
+1) Ask for minimal but targeted context first
+
+- Reply with a short clarification instead of editing right away, for example:
+
+  > “I can do that. To generate a first version that looks like your site (not just the demo), I need a few basics:  
+  > 1) Site name  
+  > 2) What the site is for (e.g. personal cars, portfolio, business, blog)  
+  > 3) Main pages you want (Home, About, Garage, Contact, etc.)  
+  > 4) Whether to use the existing images + manifest as the primary visual source.  
+  >  
+  > You can answer in one short sentence if you like, and I’ll fill in the rest.”
+
+- Only after getting those answers (or an explicit “just pick something reasonable”) should the agent start creating or rewriting views/layouts.
+
+2) Do not clone the examples verbatim
+
+- Treat everything under `resources/examples` as **reference only**:
+  - Use them to learn **how** to wire features (blog, JSON‑LD, SEO tags, layout patterns, forms).
+  - Do **not** leave Kavera marketing text, demo nav links, or example copy in a site that is meant to be “real” for the user.
+- For real sites:
+  - Replace or heavily adapt the main layout (`templates.main`) so it reflects the user’s project (site name, nav, footer), not the Kavera starter copy.
+  - Do not surface example routes (like `/integrations`, `/features`, etc.) in the primary navigation unless the user explicitly wants them.
+
+3) Use the image manifest and layout images as primary design input
+
+- Always consult `storage/app/private/images/manifest.json` when generating or refactoring content:
+  - Prefer `provider = "user"` images for hero and key sections.
+  - Use `orientation`, `aspect_ratio`, and `original_path` to decide placement (hero vs. card vs. background).
+  - Use the first few `foreground_colors` / `background_colors` entries as color cues for backgrounds, accents, or SVG decorations.
+- Also check `storage/app/private/images/layout`:
+  - Images here may represent full‑page or section layout concepts (e.g. exports from Photoshop/Illustrator).
+  - Directory structure and filenames may hint at intended usage (e.g. `home-hero-layout`, `about-section-02`); respect those hints when mapping to sections.
+
+4) JSON‑LD and SEO are not optional
+
+- JSON‑LD:
+  - Implement at least one JSON‑LD block for the home (`index`) page using the pattern from the examples:
+    - Author JSON‑LD in `resources/views/jsonld/index.jsonld`.
+    - Include it via:
+
+      ```blade
+      @section('jsonld')
+      {!! file_get_contents(resource_path('views/jsonld/index.jsonld')) !!}
+      @endsection
+      ```
+
+  - When creating additional important pages (e.g., Garage, About), add JSON‑LD where it makes sense (Person, WebSite, Vehicle, etc.) if the user’s intent is clear enough.
+
+- SEO meta:
+  - For **every** new or modified page under `resources/views/content`, set `$pageTitle` and `$pageDescription` at the top as documented earlier so the main layout can render proper head tags.
+  - Titles and descriptions must be specific to that page (no leftover example text).
+
+5) Alt text for images
+
+- Every `<img>` tag must have a meaningful `alt`:
+  - Derive it from:
+    - `original_path` (e.g. `my cars/1989 Chevy Cavalier.png` → “1989 Chevy Cavalier in a driveway”).
+    - Rekognition `objects` (e.g. `Car`, `Station Wagon`, `Buggy`, `Person`) to refine the phrasing.
+    - Folder structure (e.g. `layout/home-hero-01` suggests “Full‑page hero layout concept for home page”).
+  - Never leave empty or generic alts like “image” unless the image is clearly decorative and the layout already conveys the same information.
+
+6) CSS framework and layout styling
+
+- If the user does **not** specify a CSS framework:
+  - Default to Bootstrap, using the existing CDN setup in the main layout.
+  - Do **not** introduce another framework (Tailwind, Bulma, etc.) without an explicit request.
+- Be visually creative, not just functional:
+  - Use sectional backgrounds (solid colors, subtle gradients, muted bands) inspired by the image manifest’s foreground/background colors.
+  - Consider simple SVG shapes or dividers (e.g., curves, diagonals, soft geometric overlays) that match the site’s theme (cars, roads, motion), while keeping HTML semantic and accessible.
+
+7) Creativity over boilerplate
+
+- Do not generate a site that is just stacked white sections with identical typography.
+- Use the project’s data (images, colors, filenames, folder structure) to drive:
+  - Section hierarchy (hero, timeline, gallery, stories).
+  - Visual emphasis (which cars or images get hero placement vs. card placement).
+  - Subtle thematic touches (e.g., horizontal “road” dividers, gauge‑like chips, color swatches).
+
+Following these rules should prevent agents from blindly cloning the example site and instead push them to:
+- Ask a minimal set of clarifying questions,
+- Use the manifest and layout images as first‑class design input,
+- Implement JSON‑LD + SEO + alt text consistently,
+- And build a site that actually feels like the user’s project.
+
+---
+
 ### Image Ingest, Optimization & Manifest Pipeline
 
 Agents should treat images as a first‑class data source for page generation. This repo now ships with a full ingest + analysis pipeline that collects images from providers, runs AWS Rekognition, optimizes assets, and builds an AI‑friendly manifest.
@@ -121,8 +198,8 @@ Agents should treat images as a first‑class data source for page generation. T
 
   ```bash
   php artisan app:images-manifest
-  # Use --force to re‑run Rekognition and re‑generate WebP files even if entries already exist
-  # php artisan app:images-manifest --force
+  # Use --rekog to run AWS Rekognition to get image properties
+  # php artisan app:images-manifest --rekog
   ```
 
 - What it scans:
@@ -144,7 +221,8 @@ Agents should treat images as a first‑class data source for page generation. T
       "brightness": "NN%",
       "sharpness": "NN%",
       "contrast": "NN%",
-      "dominant_colors": ["color phrase 1", "color phrase 2", "..."],
+      "foreground_colors": ["color phrase 1 (#rrggbb)", "..."],
+      "background_colors": ["color phrase 1 (#rrggbb)", "..."],
       "number_of_human_faces": 0,
       "text_segments": ["TEXT1", "TEXT2", "..."]
   }
@@ -152,7 +230,7 @@ Agents should treat images as a first‑class data source for page generation. T
 
 - Ordering & thresholds:
   - `objects` are Rekog labels sorted by confidence (highest first).
-  - `dominant_colors` are derived from Rekognition’s dominant color data and converted into human‑readable phrases (including grays, white/black, brown, magenta, etc.).
+  - `foreground_colors` / `background_colors` are derived from Rekognition’s dominant color data for foreground and background regions (falling back to full-image colors when needed) and converted into human‑readable phrases with hex codes.
   - `text_segments` are unique, high‑confidence (>95%) text detections sorted by confidence.
 
 **5) WebP optimization & URLs**
@@ -173,7 +251,7 @@ Agents should treat images as a first‑class data source for page generation. T
   - For any manifest entry:
 
     ```text
-    /images/optimized/{available_size}/{id}
+    /storage/images/optimized/{available_size}/{id}
     ```
 
     where `{available_size}` is one of the sizes listed in `available_sizes` (or `small` for very small originals).
