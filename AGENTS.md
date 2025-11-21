@@ -187,10 +187,10 @@ Agents should treat images as a first‑class data source for page generation. T
     ```json
     {
       "notes": [
-        "Rekog objects, dominant_colors, and text appear in highest confidence order (index 0..N).",
+        "Rekog objects, colors, and text appear in highest significance order (index 0..N).",
         "Use and utilize all pictures where provider = 'user'.",
         "Adhere to any user image directory structure and file naming to infer intended page usage.",
-        "Public image URLs are /images/optimized/{available_size}/{id}."
+        "Public image URLs are /storage/images/optimized/{available_size}/{id}."
       ],
       "images": [
         {
@@ -412,18 +412,53 @@ Agent guidance
 
 ---
 
-### Podium Usage
+### IMPORTANT: Podium Usage for Users and AI Agents
 
-If Podium is installed use the `podium art` command instead of `php artisan` as this runs artisan inside of the Docker container for a more version targeted execution.
+If Podium is installed use the `podium art` command instead of `php artisan` as this runs artisan inside of the Docker container for a more version‑targeted execution.
 
-If you are running Podium commands from a non-interactive agent or in an environment without a TTY (e.g., this AI harness), wrap the command with `script` so Podium receives a pseudo‑TTY:
+All of the following Podium commands (except `exec` and `exec-root`) should be run from the local project directory (where `docker-compose.yaml` lives); inside the container they execute from `/usr/share/nginx/html`.
 
-```bash
-script -q -c "podium art app:update-content-list" /dev/null
-```
-
-General pattern for Podium via agents/CI:
+Common patterns:
 
 ```bash
-script -q -c "podium art <command> [options]" /dev/null
+# Laravel Artisan
+podium art app:images-manifest
+
+# PHP CLI (lint, one-off scripts)
+podium php -l app/Console/Commands/BuildImageManifest.php
+
+# Composer (runs with -d /usr/share/nginx/html)
+podium composer install
+
+# WordPress CLI (for WordPress projects)
+podium wp plugin list
+
+# PHPCS (uses /home/developer/.config/phpcs-ruleset.xml by default inside the container)
+podium phpcs app/Console/Commands/BuildImageManifest.php
+
+# PHPCBF (uses /home/developer/.config/phpcs-ruleset.xml by default inside the container)
+podium phpcbf app/Console/Commands/BuildImageManifest.php
+
+# PHPMD (phpmd binary + /home/developer/.config/phpmd.xml must exist in container; defaults are auto-attached)
+podium phpmd app/Console/Commands/BuildImageManifest.php
 ```
+
+For any other CLI executable as the developer user (runs from the project root inside the container):
+
+```bash
+podium exec <command> [options]
+```
+
+To run commands as root:
+
+```bash
+podium exec-root <command> [options]
+```
+
+Note for AI agents and CI:
+- When running these commands non‑interactively, wrap them with `script` so Podium receives a pseudo‑TTY, for example:
+
+  ```bash
+  script -q -c "podium art app:images-manifest" /dev/null
+  script -q -c "podium php -l app/Console/Commands/BuildImageManifest.php" /dev/null
+  ```

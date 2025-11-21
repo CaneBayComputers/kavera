@@ -16,12 +16,11 @@ class BuildImageManifest extends Command
      */
     protected $signature = 'app:images-manifest
         {image? : Optional image path (relative to project base) to analyze}
-        {--pages= : Comma-separated page slugs to include}
-        {--rekognition : Enable AWS Rekognition label detection}
-        {--max-labels=25 : Max Rekognition labels}
-        {--min-confidence=70 : Min confidence (0-100)}
-        {--format=both : Output format: yaml|json|both}
-        {--force : Overwrite existing manifest files}';
+        {--rekognition : Enable AWS Rekognition analysis}
+        {--rekog : Alias for --rekognition}
+        {--rekog-faces : Include Rekognition face analysis}
+        {--rekog-text : Include Rekognition text detection}
+        {--rekog-max-labels=25 : Max Rekognition labels}';
 
     /**
      * The console command description.
@@ -34,20 +33,25 @@ class BuildImageManifest extends Command
     {
         $imagePath = (string) ($this->argument('image') ?? '');
 
+        $useRekognition = (bool) $this->option('rekognition') || (bool) $this->option('rekog');
+        $includeFaces = (bool) $this->option('rekog-faces');
+        $includeText = (bool) $this->option('rekog-text');
+        $rekogMaxLabels = $this->option('rekog-max-labels');
+        $rekogMaxLabels = $rekogMaxLabels !== null ? (int) $rekogMaxLabels : null;
+
         // Temporary single-image Rekognition test path (debug helper)
         if ($imagePath !== '') {
-            return $this->handleSingleImage($imagePath, $rekognition);
+            return $this->handleSingleImage($imagePath, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels);
         }
-        $force = (bool) $this->option('force');
 
-        return $this->handleBulkIngest($rekognition, $force);
+        return $this->handleBulkIngest($rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels);
     }
 
     /**
      * Temporary single-image Rekognition test: copy to /tmp, resize to max 1920px, send to Rekognition,
      * and write a minimal manifest.json under storage/app/private/images/.
      */
-    private function handleSingleImage(string $imagePath, RekognitionService $rekognition): int
+    private function handleSingleImage(string $imagePath, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels): int
     {
         $absolute = $this->resolveImagePath($imagePath);
         if (! is_file($absolute)) {
@@ -112,12 +116,16 @@ class BuildImageManifest extends Command
         $faces = [];
         $textDetections = [];
 
-        if ($rekognition->isAvailable()) {
-            $labels = $rekognition->detectLabels($tmpPath);
+        if ($useRekognition && $rekognition->isAvailable()) {
+            $labels = $rekognition->detectLabels($tmpPath, $rekogMaxLabels);
             $imageProperties = $rekognition->detectImageProperties($tmpPath);
-            $faces = $rekognition->detectFaces($tmpPath);
-            $textDetections = $rekognition->detectText($tmpPath);
-        } else {
+            if ($includeFaces) {
+                $faces = $rekognition->detectFaces($tmpPath);
+            }
+            if ($includeText) {
+                $textDetections = $rekognition->detectText($tmpPath);
+            }
+        } elseif ($useRekognition) {
             $this->warn('AWS Rekognition SDK/credentials not available; analysis fields will be empty.');
         }
 
@@ -138,7 +146,8 @@ class BuildImageManifest extends Command
         $brightness = null;
         $sharpness = null;
         $contrast = null;
-        $colors = [];
+        $foregroundColorsOut = [];
+        $backgroundColorsOut = [];
 
         if (! empty($imageProperties['full']['quality'])) {
             $quality = $imageProperties['full']['quality'];
@@ -146,35 +155,69 @@ class BuildImageManifest extends Command
             $sharpness = $quality['sharpness'] ?? null;
             $contrast = $quality['contrast'] ?? null;
         }
-        // Prefer foreground/background dominant colors for palette; fall back to full if needed.
-        $colorSets = [];
+        // Separate foreground/background dominant colors; fall back to full if needed.
         if (! empty($imageProperties['foreground']['dominant_colors']) && is_array($imageProperties['foreground']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['foreground']['dominant_colors'];
+            foreach ($imageProperties['foreground']['dominant_colors'] as $color) {
+                $hex = (string) ($color['hex'] ?? '');
+                if ($hex === '') {
+                    continue;
+                }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $foregroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
+            }
         }
         if (! empty($imageProperties['background']['dominant_colors']) && is_array($imageProperties['background']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['background']['dominant_colors'];
-        }
-        if (empty($colorSets) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['full']['dominant_colors'];
-        }
-
-        foreach ($colorSets as $set) {
-            foreach ($set as $color) {
+            foreach ($imageProperties['background']['dominant_colors'] as $color) {
                 $hex = (string) ($color['hex'] ?? '');
-                if ($hex !== '') {
-                    $colors[] = $this->describeColor($hex);
+                if ($hex === '') {
+                    continue;
                 }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $backgroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
+            }
+        }
+        if (empty($foregroundColorsOut) && empty($backgroundColorsOut) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
+            // If no foreground/background info, treat full-image colors as foreground.
+            foreach ($imageProperties['full']['dominant_colors'] as $color) {
+                $hex = (string) ($color['hex'] ?? '');
+                if ($hex === '') {
+                    continue;
+                }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $foregroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
             }
         }
 
-        $facesCount = is_array($faces) ? count($faces) : 0;
+        $facesCount = null;
+        if ($includeFaces) {
+            $facesCount = is_array($faces) ? count($faces) : 0;
+        }
 
-        $textSegments = [];
-        if (! empty($textDetections)) {
+        $textSegments = null;
+        if ($includeText && ! empty($textDetections)) {
             usort($textDetections, static function ($a, $b) {
                 return ($b['confidence'] ?? 0) <=> ($a['confidence'] ?? 0);
             });
             $seenText = [];
+            $segments = [];
             foreach ($textDetections as $det) {
                 $confidence = (float) ($det['confidence'] ?? 0);
                 if ($confidence < 95.0) {
@@ -190,8 +233,9 @@ class BuildImageManifest extends Command
                     continue;
                 }
                 $seenText[$key] = true;
-                $textSegments[] = $text;
+                $segments[] = $text;
             }
+            $textSegments = $segments;
         }
 
         $disk = Storage::disk('local'); // storage/app/private
@@ -206,8 +250,9 @@ class BuildImageManifest extends Command
                 'brightness' => $this->toPercent($brightness),
                 'sharpness' => $this->toPercent($sharpness),
                 'contrast' => $this->toPercent($contrast),
-                'dominant_colors' => $colors,
-                'faces' => $facesCount,
+                'foreground_colors' => $foregroundColorsOut,
+                'background_colors' => $backgroundColorsOut,
+                'number_of_human_faces' => $facesCount,
                 'text_segments' => $textSegments,
             ],
         ];
@@ -232,7 +277,7 @@ class BuildImageManifest extends Command
      * Bulk ingest pipeline: walk provider folders under storage/app/private/images,
      * analyze with Rekognition, update XMP, generate WebP variants, and build manifest.
      */
-    private function handleBulkIngest(RekognitionService $rekognition, bool $force): int
+    private function handleBulkIngest(RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels): int
     {
         $baseDir = storage_path('app/private/images');
         $providers = ['pexels', 'pixabay', 'unsplash', 'user'];
@@ -254,9 +299,9 @@ class BuildImageManifest extends Command
             }
 
             if ($provider === 'user') {
-                $this->processUserFolder($providerDir, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
+                $this->processUserFolder($providerDir, $provider, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
             } else {
-                $this->processProviderFolder($providerDir, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
+                $this->processProviderFolder($providerDir, $provider, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
             }
         }
 
@@ -267,7 +312,7 @@ class BuildImageManifest extends Command
         return self::SUCCESS;
     }
 
-    private function processProviderFolder(string $providerDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
+    private function processProviderFolder(string $providerDir, string $provider, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels, array &$state, array &$imagesByHash, int &$processed): void
     {
         $dirIterator = new \RecursiveDirectoryIterator($providerDir, \FilesystemIterator::SKIP_DOTS);
         $iterator = new \RecursiveIteratorIterator($dirIterator);
@@ -288,11 +333,11 @@ class BuildImageManifest extends Command
             $searchFolder = $parts[0] ?? '';
             $originalKeyTerms = $this->parseKeyTermsFromFolder($searchFolder);
 
-            $this->processImageForManifest($provider, $absolute, $originalKeyTerms, $rekognition, $force, $state, $imagesByHash, $processed);
+            $this->processImageForManifest($provider, $absolute, $originalKeyTerms, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
         }
     }
 
-    private function processUserFolder(string $userDir, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
+    private function processUserFolder(string $userDir, string $provider, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels, array &$state, array &$imagesByHash, int &$processed): void
     {
         $dirIterator = new \RecursiveDirectoryIterator($userDir, \FilesystemIterator::SKIP_DOTS);
         $iterator = new \RecursiveIteratorIterator($dirIterator, \RecursiveIteratorIterator::SELF_FIRST);
@@ -306,7 +351,7 @@ class BuildImageManifest extends Command
             $ext = strtolower(pathinfo($absolute, PATHINFO_EXTENSION));
 
             if ($ext === 'zip') {
-                $this->extractAndProcessZip($absolute, $provider, $rekognition, $force, $state, $imagesByHash, $processed);
+                $this->extractAndProcessZip($absolute, $provider, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
                 // Delete original zip after extraction as requested.
                 @unlink($absolute);
                 continue;
@@ -316,11 +361,11 @@ class BuildImageManifest extends Command
                 continue;
             }
 
-            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesByHash, $processed);
+            $this->processImageForManifest($provider, $absolute, [], $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
         }
     }
 
-    private function extractAndProcessZip(string $zipPath, string $provider, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
+    private function extractAndProcessZip(string $zipPath, string $provider, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels, array &$state, array &$imagesByHash, int &$processed): void
     {
         $zip = new \ZipArchive();
         if ($zip->open($zipPath) !== true) {
@@ -352,7 +397,7 @@ class BuildImageManifest extends Command
             if (! $this->isSupportedImageExtension($absolute)) {
                 continue;
             }
-            $this->processImageForManifest($provider, $absolute, [], $rekognition, $force, $state, $imagesByHash, $processed);
+            $this->processImageForManifest($provider, $absolute, [], $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels, $state, $imagesByHash, $processed);
         }
     }
 
@@ -383,7 +428,7 @@ class BuildImageManifest extends Command
         return array_values($parts);
     }
 
-    private function processImageForManifest(string $provider, string $absolutePath, array $originalKeyTerms, RekognitionService $rekognition, bool $force, array &$state, array &$imagesByHash, int &$processed): void
+    private function processImageForManifest(string $provider, string $absolutePath, array $originalKeyTerms, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels, array &$state, array &$imagesByHash, int &$processed): void
     {
         if (! is_file($absolutePath)) {
             return;
@@ -391,26 +436,7 @@ class BuildImageManifest extends Command
 
         $hash = @sha1_file($absolutePath) ?: sha1($absolutePath);
         $existing = $imagesByHash[$hash] ?? null;
-
-        // Idempotency: if entry and optimized files exist and not forced, skip.
-        if (! $force && $existing !== null) {
-            $entry = $state['images'][$existing] ?? null;
-            if (is_array($entry) && ! empty($entry['id']) && ! empty($entry['available_sizes']) && is_array($entry['available_sizes'])) {
-                $nameId = (string) $entry['id'];
-                $allSizesPresent = true;
-                foreach ($entry['available_sizes'] as $size) {
-                    $folder = $size < 480 ? 'small' : (string) $size;
-                    $optPath = storage_path('app/public/images/optimized/' . $folder . '/' . $nameId);
-                    if (! is_file($optPath)) {
-                        $allSizesPresent = false;
-                        break;
-                    }
-                }
-                if ($allSizesPresent) {
-                    return;
-                }
-            }
-        }
+        $existingEntry = $existing !== null ? ($state['images'][$existing] ?? null) : null;
 
         $imageSize = @getimagesize($absolutePath);
         if ($imageSize === false) {
@@ -433,7 +459,7 @@ class BuildImageManifest extends Command
             return;
         }
 
-        $autoProps = $this->analyzeWithRekognition($tmpPath, $rekognition);
+        $autoProps = $this->analyzeWithRekognition($tmpPath, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels);
 
         // Unified keywords for manifest (provider terms + Rekog objects).
         $keywords = [];
@@ -454,8 +480,31 @@ class BuildImageManifest extends Command
         }
         // TODO: read existing EXIF/IPTC/XMP keywords and merge; for now we rely on provider terms + Rekog.
 
-        // Generate WebP variants; use the content hash as the stable file name
-        [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
+        // Optionally generate WebP variants; use the content hash as the stable file name.
+        // If an entry already exists and all expected sizes are present, reuse them without re-converting.
+        $imageLocationNameId = $hash . '.webp';
+        $sizes = [];
+        $allSizesPresent = false;
+        if (is_array($existingEntry) && ! empty($existingEntry['id']) && ! empty($existingEntry['available_sizes']) && is_array($existingEntry['available_sizes'])) {
+            $nameId = (string) $existingEntry['id'];
+            $allSizesPresent = true;
+            foreach ($existingEntry['available_sizes'] as $size) {
+                $folder = $size < 480 ? 'small' : (string) $size;
+                $optPath = storage_path('app/public/images/optimized/' . $folder . '/' . $nameId);
+                if (! is_file($optPath)) {
+                    $allSizesPresent = false;
+                    break;
+                }
+            }
+            if ($allSizesPresent) {
+                $imageLocationNameId = $nameId;
+                $sizes = $existingEntry['available_sizes'];
+            }
+        }
+
+        if (! $allSizesPresent) {
+            [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
+        }
 
         // Provider-specific metadata fields
         $originalQueryTerms = $provider === 'user' ? [] : array_values($originalKeyTerms);
@@ -562,18 +611,22 @@ class BuildImageManifest extends Command
         return $tmpPath;
     }
 
-    private function analyzeWithRekognition(string $tmpPath, RekognitionService $rekognition): array
+    private function analyzeWithRekognition(string $tmpPath, RekognitionService $rekognition, bool $useRekognition, bool $includeFaces, bool $includeText, ?int $rekogMaxLabels): array
     {
         $labels = [];
         $imageProperties = [];
         $faces = [];
         $textDetections = [];
 
-        if ($rekognition->isAvailable()) {
-            $labels = $rekognition->detectLabels($tmpPath);
+        if ($useRekognition && $rekognition->isAvailable()) {
+            $labels = $rekognition->detectLabels($tmpPath, $rekogMaxLabels);
             $imageProperties = $rekognition->detectImageProperties($tmpPath);
-            $faces = $rekognition->detectFaces($tmpPath);
-            $textDetections = $rekognition->detectText($tmpPath);
+            if ($includeFaces) {
+                $faces = $rekognition->detectFaces($tmpPath);
+            }
+            if ($includeText) {
+                $textDetections = $rekognition->detectText($tmpPath);
+            }
         }
 
         $objects = [];
@@ -592,7 +645,8 @@ class BuildImageManifest extends Command
         $brightness = null;
         $sharpness = null;
         $contrast = null;
-        $colors = [];
+        $foregroundColorsOut = [];
+        $backgroundColorsOut = [];
 
         if (! empty($imageProperties['full']['quality'])) {
             $quality = $imageProperties['full']['quality'];
@@ -600,35 +654,69 @@ class BuildImageManifest extends Command
             $sharpness = $quality['sharpness'] ?? null;
             $contrast = $quality['contrast'] ?? null;
         }
-        // Prefer foreground/background dominant colors for palette; fall back to full if needed.
-        $colorSets = [];
+        // Separate foreground/background dominant colors; fall back to full if needed.
         if (! empty($imageProperties['foreground']['dominant_colors']) && is_array($imageProperties['foreground']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['foreground']['dominant_colors'];
+            foreach ($imageProperties['foreground']['dominant_colors'] as $color) {
+                $hex = (string) ($color['hex'] ?? '');
+                if ($hex === '') {
+                    continue;
+                }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $foregroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
+            }
         }
         if (! empty($imageProperties['background']['dominant_colors']) && is_array($imageProperties['background']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['background']['dominant_colors'];
-        }
-        if (empty($colorSets) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
-            $colorSets[] = $imageProperties['full']['dominant_colors'];
-        }
-
-        foreach ($colorSets as $set) {
-            foreach ($set as $color) {
+            foreach ($imageProperties['background']['dominant_colors'] as $color) {
                 $hex = (string) ($color['hex'] ?? '');
-                if ($hex !== '') {
-                    $colors[] = $this->describeColor($hex);
+                if ($hex === '') {
+                    continue;
                 }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $backgroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
+            }
+        }
+        if (empty($foregroundColorsOut) && empty($backgroundColorsOut) && ! empty($imageProperties['full']['dominant_colors']) && is_array($imageProperties['full']['dominant_colors'])) {
+            // If no foreground/background info, treat full-image colors as foreground.
+            foreach ($imageProperties['full']['dominant_colors'] as $color) {
+                $hex = (string) ($color['hex'] ?? '');
+                if ($hex === '') {
+                    continue;
+                }
+                $desc = $this->describeColor($hex);
+                $normalizedHex = ltrim($hex, '#');
+                if (strlen($normalizedHex) === 3) {
+                    $normalizedHex = $normalizedHex[0] . $normalizedHex[0]
+                        . $normalizedHex[1] . $normalizedHex[1]
+                        . $normalizedHex[2] . $normalizedHex[2];
+                }
+                $foregroundColorsOut[] = trim($desc . ' (#' . strtolower($normalizedHex) . ')');
             }
         }
 
-        $facesCount = is_array($faces) ? count($faces) : 0;
+        $facesCount = null;
+        if ($includeFaces) {
+            $facesCount = is_array($faces) ? count($faces) : 0;
+        }
 
-        $textSegments = [];
-        if (! empty($textDetections)) {
+        $textSegments = null;
+        if ($includeText && ! empty($textDetections)) {
             usort($textDetections, static function ($a, $b) {
                 return ($b['confidence'] ?? 0) <=> ($a['confidence'] ?? 0);
             });
             $seenText = [];
+            $segments = [];
             foreach ($textDetections as $det) {
                 $confidence = (float) ($det['confidence'] ?? 0);
                 if ($confidence < 95.0) {
@@ -644,8 +732,9 @@ class BuildImageManifest extends Command
                     continue;
                 }
                 $seenText[$key] = true;
-                $textSegments[] = $text;
+                $segments[] = $text;
             }
+            $textSegments = $segments;
         }
 
         return [
@@ -653,7 +742,8 @@ class BuildImageManifest extends Command
             'brightness' => $this->toPercent($brightness),
             'sharpness' => $this->toPercent($sharpness),
             'contrast' => $this->toPercent($contrast),
-            'dominant_colors' => $colors,
+            'foreground_colors' => $foregroundColorsOut,
+            'background_colors' => $backgroundColorsOut,
             'number_of_human_faces' => $facesCount,
             'text_segments' => $textSegments,
         ];
@@ -661,34 +751,81 @@ class BuildImageManifest extends Command
 
     private function convertWithImagickLike(string $sourcePath, string $destPath, int $targetWidth, int $targetHeight, bool $scaleBox = false): void
     {
-        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
-        $input = $sourcePath;
-
-        $multiFrameExts = [
-            'pdf', 'gif', 'webp', 'tiff', 'tif', 'ai', 'heic', 'heif', 'avif',
-            'jp2', 'j2k', 'jpf', 'jpx', 'ico', 'eps', 'psd',
-        ];
-        if (in_array($ext, $multiFrameExts, true)) {
-            $input .= '[0]';
+        if (! class_exists(\Imagick::class)) {
+            return;
         }
 
-        $resizeArg = $scaleBox
-            ? sprintf('%dx%d>', $targetWidth, $targetHeight)
-            : sprintf('%dx%d>', $targetWidth, $targetHeight);
+        $sourcePath = (string) $sourcePath;
+        $destPath = (string) $destPath;
 
-        $cmd = [
-            '/usr/bin/convert',
-            escapeshellarg($input),
-            '-auto-orient',
-            '-quality',
-            '90',
-            '-resize',
-            escapeshellarg($resizeArg),
-            escapeshellarg($destPath),
-        ];
+        if (! is_file($sourcePath)) {
+            return;
+        }
 
-        $command = implode(' ', $cmd);
-        exec($command);
+        try {
+            $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+            $multiFrameExts = [
+                'pdf', 'gif', 'webp', 'tiff', 'tif', 'ai', 'heic', 'heif', 'avif',
+                'jp2', 'j2k', 'jpf', 'jpx', 'ico', 'eps', 'psd',
+            ];
+
+            $readTarget = $sourcePath;
+            if (in_array($ext, $multiFrameExts, true)) {
+                $readTarget .= '[0]';
+            }
+
+            $image = new \Imagick();
+            $image->setBackgroundColor('white');
+            $image->readImage($readTarget);
+
+            if ($image->getNumberImages() > 1) {
+                $image = $image->getImage();
+            }
+
+            $image->setImageAlphaChannel(\Imagick::ALPHACHANNEL_ACTIVATE);
+            $image->autoOrientImage();
+
+            $width = $image->getImageWidth();
+            $height = $image->getImageHeight();
+
+            if ($width > 0 && $height > 0 && $targetWidth > 0 && $targetHeight > 0) {
+                // $scaleBox currently behaves like a bounded resize; parameter retained for future behavior tweaks.
+                if ($scaleBox) {
+                    $scale = min($targetWidth / $width, $targetHeight / $height, 1.0);
+                } else {
+                    $scale = min($targetWidth / $width, $targetHeight / $height, 1.0);
+                }
+                $newWidth = (int) round($width * $scale);
+                $newHeight = (int) round($height * $scale);
+
+                if ($newWidth > 0 && $newHeight > 0) {
+                    $image->resizeImage($newWidth, $newHeight, \Imagick::FILTER_LANCZOS, 1.0, true);
+                }
+            }
+
+            $destExt = strtolower(pathinfo($destPath, PATHINFO_EXTENSION));
+            if ($destExt === 'webp') {
+                $image->setImageFormat('webp');
+                $image->setOption('webp:method', '6');
+            } elseif ($destExt === 'jpg' || $destExt === 'jpeg' || $destExt === 'jpe') {
+                $image->setImageFormat('jpeg');
+            }
+
+            if ($destExt === 'jpg' || $destExt === 'jpeg' || $destExt === 'jpe' || $destExt === 'webp') {
+                $image->setImageCompressionQuality(90);
+            }
+
+            $dir = dirname($destPath);
+            if (! is_dir($dir)) {
+                mkdir($dir, 0777, true);
+            }
+
+            $image->writeImage($destPath);
+            $image->clear();
+            $image->destroy();
+        } catch (\Throwable $e) {
+            $this->warn('Imagick conversion failed for ' . $sourcePath . ': ' . $e->getMessage());
+        }
     }
 
     private function toPercent($value): ?string
@@ -1005,10 +1142,10 @@ class BuildImageManifest extends Command
 
         $fresh = [
             'notes' => [
-                'Rekognition objects, colors, and text appear in highest confidence order (index 0..N).',
-                "Use and utilize all pictures where provider = 'user'.",
+                'Rekognition objects, colors, and text appear in highest significance order (index 0..N).',
+                "Prefer pictures where provider = 'user' and applicable to overall style and content.",
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
-                'Public image URLs are /images/optimized/{available_size}/{id}.',
+                'Public image URLs are /storage/images/optimized/{available_size}/{id}.',
             ],
             'images' => [],
         ];
