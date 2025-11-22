@@ -334,7 +334,7 @@ Email template helper
 
 This project ships with a JSON‑LD validation command and a simple convention for per‑page schema. Schema markup should be generated whenever possible and included at the bottom of the content page. An example can be found in `resources/examples/content/index.blade.php`. Follow these steps to add or update JSON‑LD.
 
-1) Base schema data from `storage/app/agent-brief.txt`
+1) Base schema data from `storage/app/private/agent-brief.txt`
 
 - If this file does not exist demand for user to run `php artisan app:agent-brief`
 
@@ -511,13 +511,13 @@ podium composer install
 # WordPress CLI (for WordPress projects)
 podium wp plugin list
 
-# PHPCS (uses /home/developer/.config/phpcs-ruleset.xml by default inside the container)
+# PHPCS (without anymore arguments or options)
 podium phpcs app/Console/Commands/BuildImageManifest.php
 
-# PHPCBF (uses /home/developer/.config/phpcs-ruleset.xml by default inside the container)
+# PHPCBF (without anymore arguments or options)
 podium phpcbf app/Console/Commands/BuildImageManifest.php
 
-# PHPMD (phpmd binary + /home/developer/.config/phpmd.xml must exist in container; defaults are auto-attached)
+# PHPMD (without anymore arguments or options)
 podium phpmd app/Console/Commands/BuildImageManifest.php
 ```
 
