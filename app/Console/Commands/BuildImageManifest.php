@@ -438,6 +438,9 @@ class BuildImageManifest extends Command
         $existing = $imagesByHash[$hash] ?? null;
         $existingEntry = $existing !== null ? ($state['images'][$existing] ?? null) : null;
 
+        $relPathForLog = $this->relativeOriginalPath($provider, $absolutePath);
+        $this->logProgress('Image: [' . $provider . '] ' . $relPathForLog);
+
         $imageSize = @getimagesize($absolutePath);
         $width = 0;
         $height = 0;
@@ -489,6 +492,19 @@ class BuildImageManifest extends Command
             return;
         }
 
+        if ($useRekognition) {
+            $mode = 'labels';
+            if ($includeFaces) {
+                $mode .= '+faces';
+            }
+            if ($includeText) {
+                $mode .= '+text';
+            }
+            $this->logProgress('  Rekog: ' . $mode);
+        } else {
+            $this->logProgress('  Rekog: disabled');
+        }
+
         $autoProps = $this->analyzeWithRekognition($tmpPath, $rekognition, $useRekognition, $includeFaces, $includeText, $rekogMaxLabels);
 
         // Unified keywords for manifest (provider terms + Rekog objects).
@@ -534,6 +550,13 @@ class BuildImageManifest extends Command
 
         if (! $allSizesPresent) {
             [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
+            if (! empty($sizes)) {
+                $this->logProgress('  WebP sizes (generated): ' . implode(', ', $sizes));
+            } else {
+                $this->logProgress('  WebP sizes: none generated');
+            }
+        } else {
+            $this->logProgress('  WebP sizes (reused): ' . implode(', ', (array) $sizes));
         }
 
         // Provider-specific metadata fields
@@ -1221,5 +1244,16 @@ class BuildImageManifest extends Command
         }
 
         $disk->put('images/manifest.json', json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function logProgress(string $message): void
+    {
+        // Podium's --json-output sets JSON_OUTPUT; avoid noisy logs in that mode.
+        $jsonOutput = env('JSON_OUTPUT', false);
+        if ($jsonOutput) {
+            return;
+        }
+
+        $this->line($message);
     }
 }
