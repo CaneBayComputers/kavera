@@ -439,12 +439,42 @@ class BuildImageManifest extends Command
         $existingEntry = $existing !== null ? ($state['images'][$existing] ?? null) : null;
 
         $imageSize = @getimagesize($absolutePath);
-        if ($imageSize === false) {
+        $width = 0;
+        $height = 0;
+
+        if ($imageSize !== false) {
+            $width = (int) ($imageSize[0] ?? 0);
+            $height = (int) ($imageSize[1] ?? 0);
+        } elseif (class_exists(\Imagick::class)) {
+            try {
+                $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+                $multiFrameExts = [
+                    'pdf', 'gif', 'webp', 'tiff', 'tif', 'ai', 'heic', 'heif', 'avif',
+                    'jp2', 'j2k', 'jpf', 'jpx', 'ico', 'eps', 'psd',
+                ];
+                $readTarget = $absolutePath;
+                if (in_array($ext, $multiFrameExts, true)) {
+                    $readTarget .= '[0]';
+                }
+
+                $probe = new \Imagick();
+                $probe->readImage($readTarget);
+                if ($probe->getNumberImages() > 1) {
+                    $probe = $probe->getImage();
+                }
+                $width = (int) $probe->getImageWidth();
+                $height = (int) $probe->getImageHeight();
+                $probe->clear();
+                $probe->destroy();
+            } catch (\Throwable $e) {
+                $this->warn('Skipping unsupported image (cannot read size via Imagick): ' . $absolutePath);
+                return;
+            }
+        } else {
             $this->warn('Skipping unsupported image (cannot read size): ' . $absolutePath);
             return;
         }
-        $width = (int) ($imageSize[0] ?? 0);
-        $height = (int) ($imageSize[1] ?? 0);
+
         if ($width <= 0 || $height <= 0) {
             $this->warn('Skipping image with invalid dimensions: ' . $absolutePath);
             return;

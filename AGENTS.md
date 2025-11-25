@@ -26,10 +26,8 @@ Dynamic content sources included and pre-built in this project:
   event or calendar pages.
 - Flickr: Albums and photo sets are synchronized and cached in Redis for use in
   gallery components.
-- Pixabay Search: Images can be pulled via CLI command and stored locally for
-  use in page templates.
-- Local public/images directory: Images placed here may be referenced directly
-  or described in an optional YAML manifest to assist with semantic placement.
+- Pixabay, Pexels and Unsplash Search: Images can be pulled via CLI command and
+  stored locally for use in page templates.
 
 The "Agent Briefing Wizard" is a CLI command that gathers project details,
 colors, pages, keywords, organization information, and design references. The
@@ -104,7 +102,7 @@ When a user says something like “make me a website” (without enough detail),
 
 3) Use the image manifest and layout images as primary design input
 
-- Always consult `storage/app/private/images/manifest.json` when generating or refactoring content:
+- Always consult `storage/app/private/images/manifest.json` when generating or refactoring content if exists:
   - Prefer `provider = "user"` images for hero and key sections.
   - Use `orientation`, `aspect_ratio`, and `original_path` to decide placement (hero vs. card vs. background).
   - Use the first few `foreground_colors` / `background_colors` entries as color cues for backgrounds, accents, or SVG decorations.
