@@ -813,7 +813,6 @@ class BuildImageManifest extends Command
             }
 
             $image->setImageAlphaChannel(\Imagick::ALPHACHANNEL_ACTIVATE);
-            $image->autoOrientImage();
 
             $width = $image->getImageWidth();
             $height = $image->getImageHeight();
