@@ -531,6 +531,11 @@ class BuildImageManifest extends Command
         $imageLocationNameId = $hash . '.webp';
         $sizes = [];
         $allSizesPresent = false;
+
+        // If the source has a non-default EXIF orientation, we must regenerate WebP assets
+        // so they pick up the new orientation handling even when sizes already exist.
+        $hasNonDefaultOrientation = $this->hasNonDefaultExifOrientation($absolutePath);
+
         if (is_array($existingEntry) && ! empty($existingEntry['id']) && ! empty($existingEntry['available_sizes']) && is_array($existingEntry['available_sizes'])) {
             $nameId = (string) $existingEntry['id'];
             $allSizesPresent = true;
@@ -541,6 +546,10 @@ class BuildImageManifest extends Command
                     $allSizesPresent = false;
                     break;
                 }
+            }
+            // Force regeneration when EXIF orientation indicates the image is rotated.
+            if ($hasNonDefaultOrientation) {
+                $allSizesPresent = false;
             }
             if ($allSizesPresent) {
                 $imageLocationNameId = $nameId;
@@ -655,7 +664,7 @@ class BuildImageManifest extends Command
                     }
                 }
             } catch (\Throwable $e) {
-                // Ignore EXIF errors; orientation is best-effort only.
+                // Orientation is best-effort only.
             }
         }
 
@@ -865,6 +874,41 @@ class BuildImageManifest extends Command
 
             $image->setImageAlphaChannel(\Imagick::ALPHACHANNEL_ACTIVATE);
 
+            // Best-effort orientation fix based on embedded metadata.
+            try {
+                $orientation = $image->getImageOrientation();
+                switch ($orientation) {
+                    case \Imagick::ORIENTATION_BOTTOMRIGHT:
+                        $image->rotateImage('white', 180);
+                        break;
+                    case \Imagick::ORIENTATION_RIGHTTOP:
+                        $image->rotateImage('white', 90);
+                        break;
+                    case \Imagick::ORIENTATION_LEFTBOTTOM:
+                        $image->rotateImage('white', 270);
+                        break;
+                    case \Imagick::ORIENTATION_TOPRIGHT:
+                        $image->flopImage();
+                        break;
+                    case \Imagick::ORIENTATION_BOTTOMLEFT:
+                        $image->flipImage();
+                        break;
+                    case \Imagick::ORIENTATION_RIGHTBOTTOM:
+                        $image->flopImage();
+                        $image->rotateImage('white', 90);
+                        break;
+                    case \Imagick::ORIENTATION_LEFTTOP:
+                        $image->flopImage();
+                        $image->rotateImage('white', 270);
+                        break;
+                    default:
+                        break;
+                }
+                $image->setImageOrientation(\Imagick::ORIENTATION_TOPLEFT);
+            } catch (\Throwable $e) {
+                // Orientation is best-effort only.
+            }
+
             $width = $image->getImageWidth();
             $height = $image->getImageHeight();
 
@@ -1062,6 +1106,40 @@ class BuildImageManifest extends Command
         $sizesToMake = [1920, 1280, 768, 480];
         $generatedSizes = [];
 
+        // Best-effort EXIF orientation fix for JPEG-family inputs; mirrors Rekog temp behavior.
+        $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        if ($src && function_exists('exif_read_data') && in_array($ext, ['jpg', 'jpeg', 'jpe'], true)) {
+            try {
+                $exif = @exif_read_data($absolutePath);
+                $orientation = isset($exif['Orientation']) ? (int) $exif['Orientation'] : 1;
+                if (in_array($orientation, [3, 6, 8], true)) {
+                    $angle = 0;
+                    if ($orientation === 3) {
+                        $angle = 180;
+                    } elseif ($orientation === 6) {
+                        $angle = -90;
+                    } elseif ($orientation === 8) {
+                        $angle = 90;
+                    }
+                    if ($angle !== 0) {
+                        $rotated = @imagerotate($src, $angle, 0);
+                        if ($rotated !== false) {
+                            imagedestroy($src);
+                            $src = $rotated;
+                            // Swap width/height when we rotated by 90/270 degrees.
+                            if (in_array($orientation, [6, 8], true)) {
+                                $tmp = $width;
+                                $width = $height;
+                                $height = $tmp;
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Orientation is best-effort only.
+            }
+        }
+
         // Very small originals: keep a single WebP at original size in a dedicated "small" folder.
         if ($longSide < 480) {
             if ($src) {
@@ -1183,6 +1261,29 @@ class BuildImageManifest extends Command
             }
         }
         @rmdir($dir);
+    }
+
+    private function hasNonDefaultExifOrientation(string $absolutePath): bool
+    {
+        $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        if (! function_exists('exif_read_data') || ! in_array($ext, ['jpg', 'jpeg', 'jpe'], true)) {
+            return false;
+        }
+
+        try {
+            $exif = @exif_read_data($absolutePath);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        if (! is_array($exif)) {
+            return false;
+        }
+
+        $orientation = isset($exif['Orientation']) ? (int) $exif['Orientation'] : 1;
+
+        // 1 is "normal"; 2-8 are rotated or mirrored variants.
+        return $orientation >= 2 && $orientation <= 8;
     }
 
     private function stripTimestampTerms(array $terms): array
