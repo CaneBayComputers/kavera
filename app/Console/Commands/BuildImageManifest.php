@@ -631,6 +631,34 @@ class BuildImageManifest extends Command
             return is_file($tmpPath) ? $tmpPath : null;
         }
 
+        // Best-effort EXIF orientation for JPEGs; ignore errors and non-JPEG formats.
+        $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        if (function_exists('exif_read_data') && in_array($ext, ['jpg', 'jpeg', 'jpe'], true)) {
+            try {
+                $exif = @exif_read_data($absolutePath);
+                $orientation = isset($exif['Orientation']) ? (int) $exif['Orientation'] : 1;
+                if (in_array($orientation, [3, 6, 8], true)) {
+                    $angle = 0;
+                    if ($orientation === 3) {
+                        $angle = 180;
+                    } elseif ($orientation === 6) {
+                        $angle = -90;
+                    } elseif ($orientation === 8) {
+                        $angle = 90;
+                    }
+                    if ($angle !== 0) {
+                        $rotated = @imagerotate($src, $angle, 0);
+                        if ($rotated !== false) {
+                            imagedestroy($src);
+                            $src = $rotated;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore EXIF errors; orientation is best-effort only.
+            }
+        }
+
         $width = imagesx($src);
         $height = imagesy($src);
         $maxDim = max($width, $height);
@@ -876,7 +904,9 @@ class BuildImageManifest extends Command
             $image->clear();
             $image->destroy();
         } catch (\Throwable $e) {
-            $this->warn('Imagick conversion failed for ' . $sourcePath . ': ' . $e->getMessage());
+            $this->warn(
+                'Imagick conversion failed for source [' . $sourcePath . '] to dest [' . $destPath . ']: ' . $e->getMessage()
+            );
         }
     }
 
@@ -1194,10 +1224,12 @@ class BuildImageManifest extends Command
 
         $fresh = [
             'notes' => [
-                'Rekognition objects and colors appear in order of prominance from most (index 0) to least (index N).',
-                "Prefer pictures where provider = 'user' and applicable to overall style and content.",
+                'Rekognition objects, colors, and text appear in highest significance order (index 0..N).',
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
                 'Public image URLs are /storage/images/optimized/{available_size}/{id}.',
+                'The available_sizes array for each image must be strictly adhered to; only choose sizes that are explicitly listed there.',
+                'Never invent or assume a size for an image URL (for example, do not use 1920 if 1920 is not present in available_sizes).',
+                "When building an image URL, always derive the {available_size} segment from the image's available_sizes array and the {id} field; do not hard-code size values.",
             ],
             'images' => [],
         ];
