@@ -404,13 +404,13 @@ class BuildImageManifest extends Command
     private function isSupportedImageExtension(string $path): bool
     {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        if ($ext === 'svg' || $ext === '') {
+        if ($ext === '') {
             return false;
         }
 
         $supported = [
             'jpg', 'jpeg', 'jpe', 'png', 'gif', 'bmp', 'tif', 'tiff', 'webp',
-            'heic', 'heif', 'pdf', 'eps', 'ai', 'psd', 'avif'
+            'heic', 'heif', 'pdf', 'eps', 'ai', 'psd', 'avif', 'svg',
         ];
 
         return in_array($ext, $supported, true);
@@ -526,46 +526,70 @@ class BuildImageManifest extends Command
         }
         // TODO: read existing EXIF/IPTC/XMP keywords and merge; for now we rely on provider terms + Rekog.
 
-        // Optionally generate WebP variants; use the content hash as the stable file name.
-        // If an entry already exists and all expected sizes are present, reuse them without re-converting.
-        $imageLocationNameId = $hash . '.webp';
+        // Optionally generate variants; use the content hash as the stable file name.
+        // SVG is treated specially: copied as-is into images/svg with available_sizes = ['svg'].
+        $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+        $imageLocationNameId = $ext === 'svg' ? $hash . '.svg' : $hash . '.webp';
         $sizes = [];
-        $allSizesPresent = false;
 
-        // If the source has a non-default EXIF orientation, we must regenerate WebP assets
-        // so they pick up the new orientation handling even when sizes already exist.
-        $hasNonDefaultOrientation = $this->hasNonDefaultExifOrientation($absolutePath);
-
-        if (is_array($existingEntry) && ! empty($existingEntry['id']) && ! empty($existingEntry['available_sizes']) && is_array($existingEntry['available_sizes'])) {
-            $nameId = (string) $existingEntry['id'];
-            $allSizesPresent = true;
-            foreach ($existingEntry['available_sizes'] as $size) {
-                $folder = $size < 480 ? 'small' : (string) $size;
-                $optPath = storage_path('app/public/images/optimized/' . $folder . '/' . $nameId);
-                if (! is_file($optPath)) {
-                    $allSizesPresent = false;
-                    break;
+        if ($ext === 'svg') {
+            // SVG: no raster optimization; just copy once into images/svg using the stable hash-based name.
+            $sizes = ['svg'];
+            $folder = $this->variantFolderForSize('svg'); // svg
+            $destDir = storage_path('app/public/images/' . $folder);
+            if (! is_dir($destDir) && ! mkdir($destDir, 0777, true) && ! is_dir($destDir)) {
+                $this->warn('Failed to create SVG target directory: ' . $destDir);
+            } else {
+                $destPath = $destDir . DIRECTORY_SEPARATOR . $imageLocationNameId;
+                if (! is_file($destPath)) {
+                    if (! @copy($absolutePath, $destPath)) {
+                        $this->warn('Failed to copy SVG to public images: ' . $absolutePath);
+                    } else {
+                        $this->logProgress('  SVG copied to images/svg as ' . $imageLocationNameId);
+                    }
+                } else {
+                    $this->logProgress('  SVG already present in images/svg as ' . $imageLocationNameId);
                 }
             }
-            // Force regeneration when EXIF orientation indicates the image is rotated.
-            if ($hasNonDefaultOrientation) {
-                $allSizesPresent = false;
-            }
-            if ($allSizesPresent) {
-                $imageLocationNameId = $nameId;
-                $sizes = $existingEntry['available_sizes'];
-            }
-        }
-
-        if (! $allSizesPresent) {
-            [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
-            if (! empty($sizes)) {
-                $this->logProgress('  WebP sizes (generated): ' . implode(', ', $sizes));
-            } else {
-                $this->logProgress('  WebP sizes: none generated');
-            }
         } else {
-            $this->logProgress('  WebP sizes (reused): ' . implode(', ', (array) $sizes));
+            // Rasterizable formats → WebP variants under images/{size}/.
+            $allSizesPresent = false;
+
+            // If the source has a non-default EXIF orientation, we must regenerate WebP assets
+            // so they pick up the new orientation handling even when sizes already exist.
+            $hasNonDefaultOrientation = $this->hasNonDefaultExifOrientation($absolutePath);
+
+            if (is_array($existingEntry) && ! empty($existingEntry['id']) && ! empty($existingEntry['available_sizes']) && is_array($existingEntry['available_sizes'])) {
+                $nameId = (string) $existingEntry['id'];
+                $allSizesPresent = true;
+                foreach ($existingEntry['available_sizes'] as $size) {
+                    $folder = $this->variantFolderForSize($size);
+                    $optPath = storage_path('app/public/images/' . $folder . '/' . $nameId);
+                    if (! is_file($optPath)) {
+                        $allSizesPresent = false;
+                        break;
+                    }
+                }
+                // Force regeneration when EXIF orientation indicates the image is rotated.
+                if ($hasNonDefaultOrientation) {
+                    $allSizesPresent = false;
+                }
+                if ($allSizesPresent) {
+                    $imageLocationNameId = $nameId;
+                    $sizes = $existingEntry['available_sizes'];
+                }
+            }
+
+            if (! $allSizesPresent) {
+                [$imageLocationNameId, $sizes] = $this->generateWebpVariants($absolutePath, $width, $height, $hash . '.webp');
+                if (! empty($sizes)) {
+                    $this->logProgress('  WebP sizes (generated): ' . implode(', ', $sizes));
+                } else {
+                    $this->logProgress('  WebP sizes: none generated');
+                }
+            } else {
+                $this->logProgress('  WebP sizes (reused): ' . implode(', ', (array) $sizes));
+            }
         }
 
         // Provider-specific metadata fields
@@ -1150,7 +1174,7 @@ class BuildImageManifest extends Command
                 if ($dst) {
                     imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
 
-                    $optDir = storage_path('app/public/images/optimized/small');
+                    $optDir = storage_path('app/public/images/small');
                     if (is_dir($optDir) || mkdir($optDir, 0777, true) || is_dir($optDir)) {
                         $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
                         if (imagewebp($dst, $destPath, 80)) {
@@ -1163,7 +1187,7 @@ class BuildImageManifest extends Command
                 imagedestroy($src);
             } else {
                 // Fallback: use ImageMagick convert to make a WebP at original size.
-                $optDir = storage_path('app/public/images/optimized/small');
+                $optDir = storage_path('app/public/images/small');
                 if (is_dir($optDir) || mkdir($optDir, 0777, true) || is_dir($optDir)) {
                     $destPath = $optDir . DIRECTORY_SEPARATOR . $nameId;
                     $this->convertWithImagickLike($absolutePath, $destPath, $width, $height);
@@ -1197,7 +1221,7 @@ class BuildImageManifest extends Command
 
                 imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
 
-                $optDir = storage_path('app/public/images/optimized/' . $target);
+                $optDir = storage_path('app/public/images/' . $target);
                 if (! is_dir($optDir) && ! mkdir($optDir, 0777, true) && ! is_dir($optDir)) {
                     imagedestroy($dst);
                     continue;
@@ -1227,7 +1251,7 @@ class BuildImageManifest extends Command
                     $targetWidth = (int) round($width * ($targetHeight / $height));
                 }
 
-                $optDir = storage_path('app/public/images/optimized/' . $target);
+                $optDir = storage_path('app/public/images/' . $target);
                 if (! is_dir($optDir) && ! mkdir($optDir, 0777, true) && ! is_dir($optDir)) {
                     continue;
                 }
@@ -1261,6 +1285,29 @@ class BuildImageManifest extends Command
             }
         }
         @rmdir($dir);
+    }
+
+    /**
+     * Map an available_size entry to its folder name under storage/app/public/images.
+     *
+     * @param mixed $size
+     */
+    private function variantFolderForSize($size): string
+    {
+        if ($size === 'svg') {
+            return 'svg';
+        }
+
+        if (is_numeric($size)) {
+            $sizeNum = (int) $size;
+            if ($sizeNum < 480) {
+                return 'small';
+            }
+
+            return (string) $sizeNum;
+        }
+
+        return (string) $size;
     }
 
     private function hasNonDefaultExifOrientation(string $absolutePath): bool
@@ -1327,7 +1374,7 @@ class BuildImageManifest extends Command
             'notes' => [
                 'Rekognition objects, colors, and text appear in highest significance order (index 0..N).',
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
-                'Public image URLs are /storage/images/optimized/{available_size}/{id}.',
+                'Public image URLs are /storage/images/{available_size}/{id}.',
                 'The available_sizes array for each image must be strictly adhered to; only choose sizes that are explicitly listed there.',
                 'Never invent or assume a size for an image URL (for example, do not use 1920 if 1920 is not present in available_sizes).',
                 "When building an image URL, always derive the {available_size} segment from the image's available_sizes array and the {id} field; do not hard-code size values.",
