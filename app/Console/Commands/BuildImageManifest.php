@@ -1374,7 +1374,8 @@ class BuildImageManifest extends Command
             'notes' => [
                 'Rekognition objects, colors, and text appear in highest significance order (index 0..N).',
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
-                'Public image URLs are /storage/images/{available_size}/{id}.',
+                'To construct the image paths: images/{available_size}/{id}.',
+                "Use Storage::url('images/...') for all image, asset, and file URLs; do not output /storage/... paths directly.",
                 'The available_sizes array for each image must be strictly adhered to; only choose sizes that are explicitly listed there.',
                 'Never invent or assume a size for an image URL (for example, do not use 1920 if 1920 is not present in available_sizes).',
                 "When building an image URL, always derive the {available_size} segment from the image's available_sizes array and the {id} field; do not hard-code size values.",
