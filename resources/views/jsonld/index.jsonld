@@ -1,0 +1,37 @@
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://example.com/#website",
+      "name": "Site Name",
+      "url": "https://example.com/",
+      "inLanguage": "en",
+      "description": "One sentence describing the site.",
+      "publisher": { "@id": "https://example.com/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://example.com/#organization",
+      "name": "Organization Name",
+      "url": "https://example.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://example.com/images/logo.png"
+      },
+      "telephone": "+1-555-555-5555",
+      "email": "hello@example.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "123 Main St",
+        "addressLocality": "City",
+        "addressRegion": "ST",
+        "postalCode": "00000",
+        "addressCountry": "US"
+      },
+      "sameAs": []
+    }
+  ]
+}
+</script>

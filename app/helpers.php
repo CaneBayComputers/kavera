@@ -345,6 +345,54 @@ if (!function_exists('eventbrite_image_url')) {
     }
 }
 
+if (!function_exists('flickr_enabled')) {
+    function flickr_enabled(): bool
+    {
+        return !empty(config('services.flickr.api_key')) && !empty(config('services.flickr.user_id'));
+    }
+}
+
+if (!function_exists('flickr_albums')) {
+    /**
+     * All cached Flickr albums (populated by app:flickr-sync), newest update first.
+     * Each album: id, title, description, count, updated_at, cover{thumb,medium,large}, page_url, photos[].
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    function flickr_albums(): array
+    {
+        $albums = array_values((array) (\Illuminate\Support\Facades\Cache::get('flickr:albums', [])['albums'] ?? []));
+        usort($albums, static fn($a, $b) => strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? '')));
+        return $albums;
+    }
+}
+
+if (!function_exists('flickr_album')) {
+    /**
+     * One cached album by Flickr album id or exact title (case-insensitive), or null.
+     * Photos: id, title, description, taken_at, tags, thumb (150 sq), small (500), medium (640/800),
+     * large (up to 1600), original, width, height, page_url.
+     *
+     * @return array<string, mixed>|null
+     */
+    function flickr_album(string $idOrTitle): ?array
+    {
+        foreach (flickr_albums() as $album) {
+            if ((string) ($album['id'] ?? '') === $idOrTitle || strcasecmp((string) ($album['title'] ?? ''), $idOrTitle) === 0) {
+                return $album;
+            }
+        }
+        return null;
+    }
+}
+
+if (!function_exists('flickr_synced_at')) {
+    function flickr_synced_at(): ?string
+    {
+        return \Illuminate\Support\Facades\Cache::get('flickr:albums', [])['synced_at'] ?? null;
+    }
+}
+
 if (!function_exists('blogger_enabled')) {
     function blogger_enabled(): bool
     {

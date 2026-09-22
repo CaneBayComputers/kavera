@@ -53,6 +53,7 @@ Everything below syncs ahead of time into Laravel's cache or local storage. Temp
 
 - 📝 Blogger: public posts import as Blade files with recent, label and monthly archive listings.
 - 🎟️ Eventbrite: events sync into the cache and render through simple helpers.
+- 📷 Flickr galleries: public albums sync into the cache on a schedule, so a photo pushed from the Flickr phone app shows up on the site without touching code.
 - 🖼️ Pixabay, Pexels and Unsplash: search and download stock images from the command line, then build an image manifest that agents use to pick images and write alt text.
 - 🧠 AI image descriptions: one flag tiles your images onto contact sheets and has Claude or GPT describe every one, so agents get real alt text and know which image belongs where.
 - ✉️ Form email: submissions are validated, filtered and emailed through SMTP.

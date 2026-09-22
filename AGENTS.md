@@ -25,6 +25,8 @@ Dynamic content sources included and pre-built in this project:
   repeatable content collection. Pulled through the Blogger API into the cache.
 - Eventbrite: Event data is fetched and normalized into the cache for display on
   event or calendar pages.
+- Flickr: Public albums are synced into the cache so a photo pushed to an album
+  from the Flickr phone app appears in the site gallery on the next sync.
 - Pixabay, Pexels and Unsplash Search: Images can be pulled via CLI command and
   stored locally for use in page templates.
 
@@ -33,7 +35,7 @@ read from the cache. Do not attempt to modify content through a CMS interface,
 as none exists. Keep HTML structure semantic and rely on existing layout and
 utility classes.
 
-**KEY CONCEPT FOR REAL, CUSTOM SITES**, replace the `resources/views` symlink with a regular `views` folder and generate your own content tree similar to the `examples` folder. Examples live in `resources/examples` and should remain sample‑only. It is probably best to simply copy the entire `examples` folder tree into the normal `resources/views` folder as a starting point. It is advised to NOT delete the example folder so that AI agents are able to use the examples to generate real content. Also, there will not be merge conflicts when updating from parent Kavera repo. 
+**KEY CONCEPT: `resources/views` is the real site, `resources/examples` is reference only.** `resources/views` ships as a small neutral starter tree (`templates/main`, `templates/blog`, `content/index`, `content/contact`, `content/gallery`, `content/blog/index`, `emails/contact`, `jsonld/index.jsonld`) with placeholder copy. Build the user's site by editing and extending that tree. `resources/examples` mirrors the same structure and shows how every feature is wired (forms, JSON-LD, blog listings, Eventbrite, Flickr galleries, stock images); copy patterns from it, never edit it, and never copy its Kavera marketing copy into a real site. Keeping the examples folder intact also avoids merge conflicts when pulling updates from the parent Kavera repo.
 
 
 ---
@@ -286,6 +288,20 @@ Agents should treat images as a first‑class data source for page generation. T
 
 ---
 
+### Flickr Galleries
+
+Photos live on Flickr; the site only caches metadata and image URLs. The owner manages the gallery by adding or removing photos in a Flickr album from the phone app, and the site follows on the next sync.
+
+- Configure in `.env`: `FLICKR_API_KEY` (a Flickr app key; public read access needs no OAuth), `FLICKR_USER_ID` (NSID like `12345678@N01`, or a username), optional `FLICKR_MAX_PHOTOS` (500) and `FLICKR_AUTO_SYNC` (true).
+- Sync: `php artisan app:flickr-sync` (options `--album=<id or exact title>`, `--max-photos=N`). Every public album on the account is pulled. `routes/console.php` also schedules it every 15 minutes when Flickr is configured and `FLICKR_AUTO_SYNC` is true, which needs the standard Laravel scheduler cron entry (`* * * * * php artisan schedule:run`).
+- Cache: one entry, `flickr:albums` → `{synced_at, user_id, albums: {id => album}}`. Only public photos are visible to an API key.
+- Helpers: `flickr_enabled()`, `flickr_albums()` (newest update first), `flickr_album($idOrTitle)`, `flickr_synced_at()`.
+- Album fields: `id`, `title`, `description`, `count`, `updated_at`, `cover{thumb,medium,large}`, `page_url`, `photos[]`.
+- Photo fields: `id`, `title`, `description`, `taken_at`, `uploaded_at`, `tags[]`, `thumb` (150px square), `small` (500px), `medium` (640 or 800px), `large` (up to 1600px), `original` (null unless the account exposes originals), `width`, `height`, `page_url`. Use `description` or `title` for alt text.
+- Starter page: `resources/views/content/gallery.blade.php` renders the album grid and `?album=<id>` renders one album. Reference: `resources/examples/content/integrations/flickr.blade.php`. Code: `app/Services/FlickrService.php`, `app/Console/Commands/SyncFlickr.php`.
+
+---
+
 ### Web Form Processing
 
 Forms are defined in Blade and configured through `config/form.php`. Form
@@ -444,4 +460,4 @@ Slug and path policy
 
 Agent guidance
 - Keep `resources/examples` as examples for reference; do not overwrite those when generating a real site.
-- For actual sites, replace the `resources/views` symlink with a real folder, then import posts and refresh the registry.
+- `resources/views/content/blog/index.blade.php` and `templates/blog.blade.php` ship in the starter tree; import posts and refresh the registry and the blog is live.

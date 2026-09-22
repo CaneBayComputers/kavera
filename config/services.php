@@ -68,6 +68,15 @@ return [
         'timeout' => env('PEXELS_TIMEOUT', 8),
     ],
 
+    'flickr' => [
+        // Public read access only needs the API key; FLICKR_USER_ID is an NSID (12345678@N01) or username.
+        'api_key' => env('FLICKR_API_KEY'),
+        'user_id' => env('FLICKR_USER_ID'),
+        'max_photos' => (int) env('FLICKR_MAX_PHOTOS', 500),
+        // When true and the scheduler is running, app:flickr-sync runs every 15 minutes.
+        'auto_sync' => filter_var(env('FLICKR_AUTO_SYNC', true), FILTER_VALIDATE_BOOL),
+    ],
+
     'vision' => [
         // "anthropic" or "openai"; --provider on app:images-manifest overrides per run.
         'provider' => env('IMAGE_VISION_PROVIDER', 'anthropic'),

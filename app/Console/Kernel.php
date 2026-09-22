@@ -27,7 +27,7 @@ class Kernel extends ConsoleKernel
     /** @SuppressWarnings(PHPMD.UnusedFormalParameter) */
     protected function schedule(Schedule $schedule)
     {
-        // No scheduled commands yet.
+        // Laravel 12 reads the schedule from routes/console.php, not from here.
     }
 
     /**
