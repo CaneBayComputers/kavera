@@ -1,48 +1,37 @@
-# 🚀 Kavera on Laravel — Build Websites at Agent Speed and Integrate Features with Ease
+# 🚀 Kavera
 
-Kavera is a Laravel-native website framework that combines flat-file content with service-driven dynamic data. Pages are simple Blade templates you can edit by hand or generate with an AI agent, and connected services like Blogger, Eventbrite, Flickr, and form webhooks feed structured content into Redis for fast, predictable rendering.
+**A Laravel website framework built for AI agents.**
 
-This allows a complete site to be created in minutes, not weeks: static content is easy to modify, dynamic content comes from the tools users already know, and forms include spam controls, validation, email handling, persistence, and webhook integrations. Kavera includes an Agent Briefing Wizard to generate an accurate build brief for AI assistants, but using an agent is optional — the system works just as well with manual workflows.
+Every page is a flat Blade file. Pages need no database, no admin panel and no CMS to fight. An agent reads a folder, writes a template and the page is live. Dynamic content like posts, events and stock images is pulled from services you already use and cached in Redis, so templates render fast and never call an API at request time.
 
-The result is a website framework that stays simple at its core, scales through services, and lets developers ship real business sites quickly and reliably.
+WordPress was built for humans clicking through a dashboard. Kavera was built for agents editing files. If you want an AI to build and maintain a real business site, this is the faster, cleaner and safer place to start.
 
-- 🧰 Turn‑key: clone, `composer install`, and run on PHP 8.3. No extra scaffolding.
-- 🤖 Agent‑first: content pages are simple files, so agents can add, move, or delete sections without fighting a CMS UI.
-- 🔌 Real features: forms with email + webhooks (Mailchimp, Zapier, Salesforce), events, galleries, stock images — zero plugin drama.
-- 🛡️ Safe by default: only approved pages resolve; everything else 404s. Forms ship with basic anti‑abuse checks.
-- 🔍 SEO‑ready: pages set proper title tags, and the Agent Brief pulls keywords you can pepper through copy and headings.
+---
 
-Get the idea? You’re not wiring a CMS. You’re shipping a site.
+## 🥊 Why Kavera over WordPress
+
+- 📁 Flat file, no database: pages are plain Blade templates, so an agent can create, edit, move or delete them with ordinary file operations. Nothing to migrate, nothing to back up, nothing to get hacked through a login page.
+- 🤖 Agent first: `AGENTS.md` tells any AI agent exactly how the project is laid out and how to build on it. No plugin archaeology, no theme editor, no wp_options table.
+- 🧰 Turn key: clone it and run it on PHP 8.3. No extra scaffolding, no installer wizard.
+- 🔌 Real features without plugins: forms with email and webhooks, events, blogging, stock images and SEO are all in the box. Zero plugin drama, zero plugin updates.
+- 🛡️ Safe by default: only approved pages resolve and everything else returns 404. Forms ship with spam controls out of the box.
+- 🔍 SEO ready: every page sets its own title, description and social tags, with optional schema markup and a validator to prove it.
+- 🧾 Version control is the CMS: every page is a file in git. Diff it, review it, roll it back.
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
-php artisan app:agent-brief
+git clone https://github.com/CaneBayComputers/kavera.git my-site
+cd my-site
 ```
 
-That’s it. Pages live in `resources/views/content`. Add or remove a page, then refresh the registry (see “Technical Reference”).
+Then tell your AI agent:
 
-Manual views setup (without Agent Brief)
-- This project ships with `resources/views` as a symlink to `resources/examples` so you can preview the example pages.
-- If you plan to manage real views manually (without the Agent Brief CLI making changes), replace the symlink with a real folder structure similar to `resources/examples`:
+> Read AGENTS.md and build me a website for ...
 
-```bash
-# 1) Remove the views symlink
-rm resources/views
-
-# 2) Create your own views tree
-mkdir -p resources/views/{content,templates,emails,jsonld}
-
-# Optional: seed from examples to start from the templates
-rsync -a resources/examples/ resources/views/
-
-# 3) Refresh the content registry so routes resolve
-php artisan app:update-content-list
-```
-
-After this, edits under `resources/views` won’t affect the example set.
+That is the whole workflow. `AGENTS.md` contains everything the agent needs: setup, page structure, forms, integrations, images, SEO and code standards.
 
 ---
 
@@ -54,101 +43,26 @@ After this, edits under `resources/views` won’t affect the example set.
 - 🔍 SEO Setup: Title/description per page plus optional JSON‑LD schema markup with a built‑in validator.
 - 🎟️ Events: Eventbrite page you can flip on with two env keys.
 - 🖼️ Images: Pixabay helper for quick stock image pulls.
-- 🧭 Agent Brief Wizard: generates a project‑specific prompt to guide any AI agent.
 - 📝 Blogging: Write in Blogger, publish on your site — posts become simple pages with recents, tags, and archives.
-
----
-
-## 🤖 Agent Workflow (Fast Path)
-
-1) Drop images into `/storage/app/public/images`.
-2) Run the Agent Brief wizard: `php artisan app:agent-brief`.
-3) Let your agent scaffold pages and sections (hero, features, cards, galleries).
-4) Wire forms via simple config (email + webhooks).
-5) Flip on integrations with env keys. Done.
 
 ---
 
 ## 🔌 Integrations
 
-- Eventbrite
-  - Events are synchronized into Redis and read at render via helpers; avoid calling external APIs on page load.
-  - Example view: `resources/examples/content/events.blade.php`.
+Everything below syncs into Redis or local storage ahead of time. Templates read the cache and never call an external API on page load.
 
-- Blogger
-  - Public posts are fetched via the Blogger API (API key only), imported as Blade files for fast, predictable rendering.
-  - Lightweight Redis indices power recent posts, labels, and monthly archives.
-  - Example: `resources/examples/content/integrations/blogger.blade.php` and the blog layout at `resources/examples/templates/blog.blade.php`.
+- 📝 Blogger: public posts import as Blade files with recent, label and monthly archive listings.
+- 🎟️ Eventbrite: events sync into Redis and render through simple helpers.
+- 🖼️ Pixabay, Pexels and Unsplash: search and download stock images from the command line, then build an image manifest that agents use to pick images and write alt text.
+- 👁️ AWS Rekognition: optional image analysis that tags objects, colors, faces and text for the manifest.
+- ✉️ Form email: submissions are validated, filtered and emailed through SMTP.
+- 🗄️ Form storage: optionally save submissions to a database for later review. This is the only feature that touches a database at all.
+- 🔗 Form webhooks: send submissions to Mailchimp, Zapier or Salesforce with explicit field maps.
+- 🧠 Google reCAPTCHA: drop in spam protection for any form.
 
-- Flickr
-  - Albums and photo sets are synchronized and cached in Redis for gallery components.
-  - Example view: `resources/examples/content/features-flickr.blade.php`.
-
-- Pixabay (+ optional AWS Rekognition)
-  - Optionally run downloaded images through AWS Rekognition to auto-tag/filter; requires AWS credentials.
-  - Example view: `resources/examples/content/features-pixabay.blade.php`.
-
-Notes
-- Dynamic collections are read from Redis by templates; use your sync/job flow to hydrate caches before rendering.
-- Example pages live under `resources/examples/content/`; see them for usage patterns and helpers.
+Setup and field mapping for each integration lives in `AGENTS.md`.
 
 ---
-
-## 🔌 Webhook Integrations
-
-Send form submissions anywhere — Mailchimp, Zapier, Salesforce — with simple, explicit field maps. No plugins, no guesswork.
-
-Setup and code examples live in AGENTS.md → “Webhook Adapters.”
-
----
-
-## 🧭 Agent Brief Wizard
-
-Run an interactive command to generate a project‑specific prompt that tells any AI agent exactly how to build out your site within Kavera on Laravel.
-
-```bash
-php artisan app:agent-brief
-```
-
-It collects pages, forms, tone, business info, and more, then prints a ready‑to‑paste brief.
-
----
-
-## 📎 Tech & Setup
-
-Looking for code examples, mapping, or integration setup? See AGENTS.md for:
-- Webhook Adapters (Mailchimp, Zapier, Salesforce) with full field_map examples
-- Forms + validation + spam controls (throttling, link checks, reCAPTCHA)
-- Content model, routes, and page registry refresh
-
-This keeps the README friendly while making the deeper bits easy to find.
-
----
-
-## 📝 Blogging Quick Start (Blogger)
-
-1) Enable Blogger API v3 in Google Cloud and create an API key.
-2) Set these in your `.env`:
-
-```
-BLOGGER_API_KEY=your_api_key
-BLOGGER_BLOG_ID=your_blog_id
-# Optional: BLOGGER_CONTENT_BASE (defaults to "blog")
-```
-
-3) Import posts as Blade files and refresh the registry:
-
-```bash
-php artisan app:blogger-import --per_page=50
-php artisan app:update-content-list
-```
-
-4) View your blog at `/<base>` (default `/blog`). Labels and archives are available at `/<base>/<label-segment>/<label>` and `/<base>/<YYYY>/<MM>`.
-
-Notes
-- Posts render as static Blade files (fast); Redis holds only indices (recent, labels, archives).
-- Default layout is `templates.blog`; customize via `BLOGGER_POST_LAYOUT` and `BLOGGER_POST_SECTION`.
-
 
 ## 📄 License
 
