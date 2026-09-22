@@ -6,7 +6,7 @@ This allows a complete site to be created in minutes, not weeks: static content 
 
 The result is a website framework that stays simple at its core, scales through services, and lets developers ship real business sites quickly and reliably.
 
-- 🧰 Turn‑key: clone and run with Podium CLI (or locally with PHP 8.3). No extra scaffolding.
+- 🧰 Turn‑key: clone, `composer install`, and run on PHP 8.3. No extra scaffolding.
 - 🤖 Agent‑first: content pages are simple files, so agents can add, move, or delete sections without fighting a CMS UI.
 - 🔌 Real features: forms with email + webhooks (Mailchimp, Zapier, Salesforce), events, galleries, stock images — zero plugin drama.
 - 🛡️ Safe by default: only approved pages resolve; everything else 404s. Forms ship with basic anti‑abuse checks.
@@ -18,7 +18,6 @@ Get the idea? You’re not wiring a CMS. You’re shipping a site.
 
 ## ⚡ Quick Start
 
-Using Podium (recommended)
 ```bash
 php artisan app:agent-brief
 ```
@@ -40,7 +39,7 @@ mkdir -p resources/views/{content,templates,emails,jsonld}
 rsync -a resources/examples/ resources/views/
 
 # 3) Refresh the content registry so routes resolve
-podium art app:update-content-list
+php artisan app:update-content-list
 ```
 
 After this, edits under `resources/views` won’t affect the example set.
@@ -121,7 +120,6 @@ Looking for code examples, mapping, or integration setup? See AGENTS.md for:
 - Webhook Adapters (Mailchimp, Zapier, Salesforce) with full field_map examples
 - Forms + validation + spam controls (throttling, link checks, reCAPTCHA)
 - Content model, routes, and page registry refresh
-- Podium commands and troubleshooting
 
 This keeps the README friendly while making the deeper bits easy to find.
 
