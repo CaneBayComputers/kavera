@@ -124,7 +124,11 @@ When a user says something like “make me a website” (without enough detail),
   - For **every** new or modified page under `resources/views/content`, set `$pageTitle` and `$pageDescription` at the top as documented earlier so the main layout can render proper head tags.
   - Titles and descriptions must be specific to that page (no leftover example text).
 
-5) Alt text for images
+5) Image URLs always go through `cdn()`
+
+- Never write a literal `/storage/images/...` (or any other static media path) in a template. Wrap every image, video or download reference in `cdn()` or `images()`: `<img src="{{ cdn('/storage/images/1280/<id>.webp') }}" …>`. Production serves media from the site's S3 bucket and `cdn()` is what switches between local dev paths and the bucket URL. A site built with literal paths has to be rewritten before deploy.
+
+6) Alt text for images
 
 - Every `<img>` tag must have a meaningful `alt`:
   - Derive it from:
@@ -133,7 +137,7 @@ When a user says something like “make me a website” (without enough detail),
     - Folder structure (e.g. `layout/home-hero-01` suggests “Full‑page hero layout concept for home page”).
   - Never leave empty or generic alts like “image” unless the image is clearly decorative and the layout already conveys the same information.
 
-6) CSS framework and layout styling
+7) CSS framework and layout styling
 
 - If the user does **not** specify a CSS framework:
   - Default to Bootstrap, using the existing CDN setup in the main layout.
@@ -142,7 +146,7 @@ When a user says something like “make me a website” (without enough detail),
   - Use sectional backgrounds (solid colors, subtle gradients, muted bands) inspired by the image manifest’s foreground/background colors.
   - Consider simple SVG shapes or dividers (e.g., curves, diagonals, soft geometric overlays) that match the site’s theme (cars, roads, motion), while keeping HTML semantic and accessible.
 
-7) Creativity over boilerplate
+8) Creativity over boilerplate
 
 - Do not generate a site that is just stacked white sections with identical typography.
 - Use the project’s data (images, colors, filenames, folder structure) to drive:
@@ -176,7 +180,9 @@ Kavera does not ingest or analyze images itself. **Website Manifestor**, a separ
 php artisan app:website-manifest-import      # zeltro art app:website-manifest-import
 ```
 
-Copies `manifest.json` to `storage/app/private/images/manifest.json` (adding the URL rule below to its notes), `website-brief.md` to `storage/app/private/`, and every optimized variant to `storage/app/public/images/<size>/<id>`. The imported images under `storage/app/public/images/` are tracked in git on purpose, so a plain `git pull` deploy carries them; `.website-manifest/` itself is up to each site's `.gitignore`. Re-run the import after the client changes anything in Website Manifestor. Public URL of an image: `/storage/images/{size}/{id}`; only sizes listed in that image's `available_sizes` exist, and `php artisan storage:link` must have been run.
+Copies `manifest.json` to `storage/app/private/images/manifest.json` (adding the URL rule below to its notes), `website-brief.md` to `storage/app/private/`, and every optimized variant to `storage/app/public/images/<size>/<id>`. When `AWS_BUCKET` is set it also uploads every variant to `s3://<bucket>/storage/images/<size>/<id>` with `image/webp` (or `image/svg+xml`) and a one-week `Cache-Control` (`--no-s3` skips that, `--s3` forces it). Re-run the import after the client changes anything in Website Manifestor.
+
+**Production serves images from S3, not from the server.** `storage/app/public/` stays gitignored and nothing under it is ever committed; the images live in the site's `<site>.cdn` bucket and, for regenerating variants, on the dev box. The bucket must already exist with Shawn's standard CDN config (public `s3:GetObject` on `<bucket>/*`, all four Public Access Block flags off, Object Ownership `BucketOwnerEnforced`); the import never creates one. Every image reference in a template goes through `cdn()` (or `images()`), e.g. `{{ cdn('/storage/images/1280/<id>.webp') }}`, never a literal `/storage/images/...` path: `cdn()` returns `https://s3.<region>.amazonaws.com/<bucket>/storage/images/...` when `AWS_BUCKET` is set and the plain local path when it is empty, so the same template serves from local storage in dev and from S3 in prod. In `.env` set `AWS_BUCKET=<site>.cdn`, `AWS_DEFAULT_REGION=us-east-1` and `AWS_USE_PATH_STYLE_ENDPOINT=true` (the dot in `.cdn` bucket names breaks virtual-host TLS); leave `AWS_BUCKET` empty in dev. Only sizes listed in an image's `available_sizes` exist. To publish by hand instead of through the import: `aws s3 sync storage/app/public/images/ s3://<site>.cdn/storage/images/ --content-type image/webp --cache-control 'public, max-age=604800'`. Local dev without a bucket needs `php artisan storage:link` so `/storage/images/...` resolves.
 
 **3) Manifest structure**
 
