@@ -95,15 +95,15 @@ When a user says something like “make me a website” (without enough detail),
   - Replace or heavily adapt the main layout (`templates.main`) so it reflects the user’s project (site name, nav, footer), not the Kavera starter copy.
   - Do not surface example routes (like `/integrations`, `/features`, etc.) in the primary navigation unless the user explicitly wants them.
 
-3) Use the image manifest and layout images as primary design input
+3) Use the website brief and image manifest as primary design input
 
-- Always consult `storage/app/private/images/manifest.json` when generating or refactoring content if exists:
-  - Prefer `provider = "user"` images for hero and key sections.
-  - Use `orientation`, `aspect_ratio`, and `original_path` to decide placement (hero vs. card vs. background).
-  - Use the colors the user supplied (or colors sampled from their logo and hero images) as cues for backgrounds, accents, or SVG decorations.
-- Also check `storage/app/private/images/layout`:
-  - Images here may represent full‑page or section layout concepts (e.g. exports from Photoshop/Illustrator).
-  - Directory structure and filenames may hint at intended usage (e.g. `home-hero-layout`, `about-section-02`); respect those hints when mapping to sections.
+- If `storage/app/private/website-brief.md` exists, read it first. It is the client intake (business facts, brand, pages with purpose and call to action, integrations) written by Website Manifestor.
+- Always consult `storage/app/private/images/manifest.json` when it exists (format below):
+  - Use every image where `provider = "user"`; prefer them for hero and key sections.
+  - Honor `usage` (page, section, role) over any guess from the file name; then `orientation`, `aspect_ratio` and `original_path` to decide placement.
+  - Use `content_analysis.description` for alt text and its `subjects`, `colors`, `text` and `people` for placement.
+  - Take colors from the brief's brand block, or from the logo and hero photos, as cues for backgrounds, accents and SVG decorations.
+- Images marked `role = "mockup"` or listed as reference images are design references (mockups, competitor screenshots, mood boards): follow their layout ideas, do not place them on the site.
 
 4) JSON‑LD and SEO are not optional
 
@@ -158,133 +158,56 @@ Following these rules should prevent agents from blindly cloning the example sit
 
 ---
 
-### Image Ingest, Optimization & Manifest Pipeline
+### Images and the Image Manifest
 
-Agents should treat images as a first‑class data source for page generation. This repo ships with an ingest pipeline that collects images from providers, optimizes assets, and builds an AI‑friendly manifest.
+Kavera does not ingest or analyze images itself. That work lives in **Website Manifestor**, a separate desktop app (`CaneBayComputers/website-manifestor`) that runs the client intake, optimizes photos, has a vision model describe them, pulls stock images and exports the result into a Kavera site. Agents read what it produced.
 
-**1) Where images live**
+**1) What an export puts in the site**
 
-- Private originals are stored under `storage/app/private/images` in these provider folders:
-  - `pexels/`, `pixabay/`, `unsplash/`, and `user/`.
-- Provider folders:
-  - Each search run is saved into a subfolder named after the original query terms, e.g. `storage/app/private/images/pixabay/sports-car-night-20251119_151633/...`.
-  - The subfolder name (minus trailing timestamp tokens) becomes `original_query_terms` for those images.
-- User folder:
-  - `storage/app/private/images/user` may contain loose images and `.zip` files.
-  - `.zip` files are extracted into a `_zip_<uuid>` subfolder, then deleted; the extracted folder structure is kept to hint at intended usage.
+- `storage/app/private/website-brief.md` — the intake in prose. Read it first.
+- `storage/app/private/images/manifest.json` — every image with its metadata (format below).
+- `storage/app/public/images/{size}/{id}` — WebP variants at `1920`, `1280`, `768` and `480` on the long side (never upscaled), `small/` for originals under 480px, `svg/` for SVGs. `id` is `<sha1>.webp` or `<sha1>.svg`.
+- Public URL: `/storage/images/{size}/{id}`. Only sizes listed in an image's `available_sizes` exist; never invent one. `php artisan storage:link` must have been run.
 
-**2) Provider import commands**
+**2) Manifest structure**
 
-- Pixabay search and download:
-  - `php artisan app:pixabay-search "<search terms...>"`
-  - Writes JPEGs into `storage/app/private/images/pixabay/<slug-timestamp>/...` and merges Pixabay tags into JPEG XMP (keywords/subjects) where possible.
-- Pexels search:
-  - `php artisan app:pexels-search "<search terms...>"`
-  - Saves Pexels images under `storage/app/private/images/pexels/<slug-timestamp>/...` and stores the Pexels `alt` text into XMP dc:description when available.
-- Unsplash search:
-  - `php artisan app:unsplash-search "<search terms...>"`
-  - Saves Unsplash images under `storage/app/private/images/unsplash/<slug-timestamp>/...` and embeds a combined description `(description + alt_description)` into XMP dc:description when present.
-
-**3) Building the image manifest**
-
-- Main command:
-
-  ```bash
-  php artisan app:images-manifest
-  # Also have an AI vision model describe every image (see section 6):
-  # php artisan app:images-manifest --describe
-  ```
-
-- What it scans:
-  - Recursively walks `storage/app/private/images/{pexels,pixabay,unsplash,user}`.
-  - Skips unsupported formats and `*.svg` files.
-  - For `user`:
-    - Detects `.zip` archives, extracts them once into `_zip_<uuid>` folders, deletes the original `.zip`, and processes all extracted images.
-
-**4) WebP optimization & URLs**
-
-- For each original:
-  - If the longest side is `< 480px`:
-    - Generates a single WebP at original size under `storage/app/public/images/optimized/small/{id}`.
-    - `available_sizes` will contain the original long‑side value (e.g. `[420]`).
-  - Otherwise:
-    - Generates WebP variants at up to `1920`, `1280`, `768`, and `480` pixels on the long side (never upscaling).
-    - Landscape: target is width; portrait: target is height.
-    - Each variant is saved under `storage/app/public/images/optimized/{size}/{id}`.
-- Filenames & idempotency:
-  - `hash = sha1(original file bytes)`.
-  - `id = "<hash>.webp"` is used for all optimized variants and as the per‑image manifest id.
-  - If manifest entry + optimized files already exist for a given hash, the command skips reprocessing unless `--force` is provided.
-- Public URLs:
-  - For any manifest entry:
-
-    ```text
-    /storage/images/optimized/{available_size}/{id}
-    ```
-
-    where `{available_size}` is one of the sizes listed in `available_sizes` (or `small` for very small originals).
-
-**5) Manifest structure (AI‑facing)**
-
-- Manifest file:
-  - Location: `storage/app/private/images/manifest.json`.
-  - Shape:
-
-    ```json
+```json
+{
+  "schema": "website-manifestor/1",
+  "project": { "name": "...", "slug": "..." },
+  "business": { "name": "...", "tagline": "...", "category": "...", "description": "...", "audience": "...", "goals": [], "differentiators": [], "phone": "...", "email": "...", "address": {}, "service_area": "...", "hours": "...", "social": {} },
+  "brand": { "colors": ["deep navy (#1b2a49)"], "fonts": [], "tone": "...", "style_keywords": [], "logo_image_id": "<id>|null", "reference_image_ids": [], "reference_urls": [] },
+  "pages": [ { "slug": "index", "title": "Home", "purpose": "...", "audience": "...", "cta": { "label": "...", "target": "..." }, "keywords": [], "sections": [ { "id": "...", "heading": "...", "intent": "...", "image_ids": [], "notes": "..." } ], "notes": "..." } ],
+  "images": [
     {
-      "notes": [
-        "Use and utilize all pictures where provider = 'user'.",
-        "Adhere to any user image directory structure and file naming to infer intended page usage.",
-        "Public image URLs are /storage/images/optimized/{available_size}/{id}."
-      ],
-      "images": [
-        {
-          "id": "<sha1>.webp",
-          "hash": "<sha1_of_original>",
-          "provider": "pexels|pixabay|unsplash|user",
-          "original_path": "relative/path/under/provider.ext",
-          "orientation": "landscape|portrait|square|banner",
-          "aspect_ratio": 1.5,
-          "original_query_terms": ["sports", "car", "night"],
-          "provider_keywords": [...],
-          "provider_description": "..." | null,
-          "available_sizes": [1920, 1280, 768, 480], // or subset / small-only
-          "content_analysis": { // only after --describe, otherwise null
-            "description": "A yellow-green BMW coupe parked between silver cars at night.",
-            "subjects": ["sports coupe", "parked cars", "parking lot"],
-            "colors": ["charcoal black (#111716)", "dark gray (#414a4b)"],
-            "text": [],
-            "people": 0,
-            "provider": "anthropic|openai", "model": "...", "analyzed_at": "..."
-          }
-        }
-      ]
+      "id": "<sha1>.webp",
+      "hash": "<sha1>",
+      "provider": "user|pixabay|pexels|unsplash|mockup",
+      "original_path": "relative/path/under/the/provider/folder.ext",
+      "original_name": "file.ext",
+      "orientation": "landscape|portrait|square|banner",
+      "aspect_ratio": 1.5,
+      "width": 1280, "height": 853,
+      "original_query_terms": [], "provider_keywords": [], "provider_description": null,
+      "available_sizes": [1280, 768, 480],
+      "content_analysis": { "description": "...", "subjects": [], "colors": ["name (#hex)"], "text": [], "people": 0, "provider": "anthropic|openai", "model": "..." },
+      "usage": { "page": "index|null", "section": "<section id>|null", "role": "hero|logo|gallery|card|background|portrait|mockup|null", "notes": "..." }
     }
-    ```
+  ],
+  "integrations": { "blog": false, "events": false, "gallery": false, "contact_form": true, "newsletter": false, "notes": "..." },
+  "raw_notes": "...",
+  "completeness": { "score": 80, "missing": ["..."] },
+  "notes": ["instructions for the agent"]
+}
+```
 
-- Provider‑specific behavior:
-  - `original_path` is always relative to `storage/app/private/images/{provider}/` (no absolute paths or provider root).
-  - For `pexels`, `pixabay`, and `unsplash`:
-    - `original_query_terms` are derived from the search folder name with trailing timestamp‑like tokens stripped.
-    - `provider_keywords`/`provider_description` are populated from provider metadata where available (e.g. Pixabay description, Pexels/Unsplash search terms and captions).
-  - `user` images:
-    - `original_query_terms` is an empty array; rely on folder structure and any embedded metadata for semantic hints.
+- `completeness.missing` lists what the client never supplied. Make sensible assumptions for those and say so in your build notes.
+- `content_analysis` is written by an AI vision model: use its `description` for alt text and the rest to choose placement. `people` above zero usually means a portrait or team photo.
+- User images with no `usage` still must be used somewhere; folder names in `original_path` are the remaining hint.
 
-- Intent:
-  - The manifest is not read by Blade at runtime; it exists for AI agents and build tooling to:
-    - Discover all available images (especially in `user/`).
-    - Understand orientation, aspect ratio, which optimized sizes exist, and (after `--describe`) what each image actually shows.
-    - Map images to page sections using folder structure and query terms when generating or refactoring content templates.
+**3) When there is no manifest**
 
-
-**6) AI content descriptions (optional, recommended)**
-
-- Command: `php artisan app:images-manifest --describe`. Options: `--provider=anthropic|openai` (overrides `IMAGE_VISION_PROVIDER`), `--redescribe` (redo images that already have one), `--sheet-size=N` (images per request).
-- How it works: after WebP generation, the smallest variant of every image lacking `content_analysis` is tiled onto numbered contact sheets (default 16 per sheet, one API request per sheet) and sent to the vision model, which returns one JSON object per cell. Answers are written to `content_analysis` on each manifest entry and survive later re-ingests, so only new images cost anything on the next run.
-- `.env` keys: `IMAGE_VISION_PROVIDER` (`anthropic` default, or `openai`), `IMAGE_VISION_SHEET_SIZE` (16), `ANTHROPIC_API_KEY` + `ANTHROPIC_VISION_MODEL` (`claude-opus-5`), `OPENAI_API_KEY` + `OPENAI_VISION_MODEL` (`gpt-6-astra`). Only the chosen provider's key is required.
-- Fields per image: `description` (one or two sentences, alt-text ready), `subjects` (most important first), `colors` (name plus hex, most dominant first), `text` (readable words as written), `people` (count), plus `provider`, `model`, `analyzed_at`.
-- SVGs are never analyzed (no raster variant). A failed sheet is logged as a warning, the rest continue, and the command exits non-zero; re-run to fill the gaps.
-- Code lives in `app/Services/Vision/`: `ContactSheetBuilder` (GD grid), `VisionPrompt` (shared prompt, JSON schema, parser), `AnthropicVisionProvider`, `OpenAiVisionProvider`, `ImageContentAnalyzer` (batching and cell mapping), `VisionProviderFactory`.
+- Ask the user to run Website Manifestor and export into this site, or to drop images under `storage/app/public/images/` and describe them. Do not build a site around images you have not seen.
 
 ---
 

@@ -42,7 +42,7 @@ That is the whole workflow. `AGENTS.md` contains everything the agent needs: set
 - 🧠 Spam control built‑in: UA/link checks, throttling, and Google reCAPTCHA (prod).
 - 🔍 SEO Setup: Title/description per page plus optional JSON‑LD schema markup with a built‑in validator.
 - 🎟️ Events: Eventbrite page you can flip on with two env keys.
-- 🖼️ Images: Pixabay helper for quick stock image pulls.
+- 🖼️ Images: drop in a manifest from Website Manifestor and agents pick images and write alt text.
 - 📝 Blogging: Write in Blogger, publish on your site — posts become simple pages with recents, tags, and archives.
 
 ---
@@ -54,8 +54,7 @@ Everything below syncs ahead of time into Laravel's cache or local storage. Temp
 - 📝 Blogger: public posts import as Blade files with recent, label and monthly archive listings.
 - 🎟️ Eventbrite: events sync into the cache and render through simple helpers.
 - 📷 Flickr galleries: public albums sync into the cache on a schedule, so a photo pushed from the Flickr phone app shows up on the site without touching code.
-- 🖼️ Pixabay, Pexels and Unsplash: search and download stock images from the command line, then build an image manifest that agents use to pick images and write alt text.
-- 🧠 AI image descriptions: one flag tiles your images onto contact sheets and has Claude or GPT describe every one, so agents get real alt text and know which image belongs where.
+- 🧾 Website Manifestor: the companion desktop app runs the client intake, optimizes photos, has Claude or GPT describe them, pulls stock images, and exports a brief and image manifest straight into a Kavera site for the agent to build from.
 - ✉️ Form email: submissions are validated, filtered and emailed through SMTP.
 - 🗄️ Form storage: optionally save submissions to a database for later review. This is the only feature that touches a database at all, and SQLite is enough.
 - 🔗 Form webhooks: send submissions to Mailchimp, Zapier or Salesforce with explicit field maps.

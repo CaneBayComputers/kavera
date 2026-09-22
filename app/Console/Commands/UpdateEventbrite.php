@@ -21,7 +21,7 @@ class UpdateEventbrite extends Command
      *
      * @var string
      */
-    protected $description = 'Fetch Eventbrite events using API key, cache sorted list in Redis.';
+    protected $description = 'Fetch Eventbrite events using API key, cache the sorted list.';
 
     public function handle(): int
     {
@@ -84,7 +84,7 @@ class UpdateEventbrite extends Command
             // Save indefinitely (no TTL)
             Cache::forever($cacheKey, $events);
 
-            $this->info('Eventbrite events saved to Redis: ' . count($events) . ' event(s).');
+            $this->info('Eventbrite events cached: ' . count($events) . ' event(s).');
             return self::SUCCESS;
         } catch (\Throwable $e) {
             $this->error('Eventbrite fetch exception: ' . $e->getMessage());

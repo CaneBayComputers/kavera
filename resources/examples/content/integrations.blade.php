@@ -2,7 +2,7 @@
 
 @php
     $pageTitle = 'Integrations';
-    $pageDescription = 'Connect services like Eventbrite, Blogger, Flickr, Pixabay, and webhooks to power dynamic content.';
+    $pageDescription = 'Connect services like Eventbrite, Blogger, Flickr, and webhooks to power dynamic content.';
 @endphp
 
 @section('content')
@@ -36,15 +36,6 @@
             <h5 class="card-title">Flickr</h5>
             <p class="card-text flex-grow-1">Synchronize albums and photo sets, then display them in gallery components without runtime API calls.</p>
             <a href="/integrations/flickr" class="stretched-link">Learn more</a>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title">Pixabay</h5>
-            <p class="card-text flex-grow-1">Pull stock images for use in templates and build a manifest agents can use to place them.</p>
-            <a href="/integrations/pixabay" class="stretched-link">Learn more</a>
           </div>
         </div>
       </div>

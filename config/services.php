@@ -50,24 +50,6 @@ return [
         'expand' => env('EVENTBRITE_EXPAND', 'venue,logo,organizer'),
     ],
 
-    'pixabay' => [
-        'key' => env('PIXABAY_API_KEY'),
-        'base_url' => env('PIXABAY_BASE_URL', 'https://pixabay.com/api/'),
-        'timeout' => env('PIXABAY_TIMEOUT', 6),
-    ],
-
-    'unsplash' => [
-        'access_key' => env('UNSPLASH_ACCESS_KEY'),
-        'base_url' => env('UNSPLASH_BASE_URL', 'https://api.unsplash.com'),
-        'timeout' => env('UNSPLASH_TIMEOUT', 8),
-    ],
-
-    'pexels' => [
-        'api_key' => env('PEXELS_API_KEY'),
-        'base_url' => env('PEXELS_BASE_URL', 'https://api.pexels.com/v1'),
-        'timeout' => env('PEXELS_TIMEOUT', 8),
-    ],
-
     'flickr' => [
         // Public read access only needs the API key; FLICKR_USER_ID is an NSID (12345678@N01) or username.
         'api_key' => env('FLICKR_API_KEY'),
@@ -75,22 +57,6 @@ return [
         'max_photos' => (int) env('FLICKR_MAX_PHOTOS', 500),
         // When true and the scheduler is running, app:flickr-sync runs every 15 minutes.
         'auto_sync' => filter_var(env('FLICKR_AUTO_SYNC', true), FILTER_VALIDATE_BOOL),
-    ],
-
-    'vision' => [
-        // "anthropic" or "openai"; --provider on app:images-manifest overrides per run.
-        'provider' => env('IMAGE_VISION_PROVIDER', 'anthropic'),
-        // Images tiled per contact sheet (one API request per sheet).
-        'sheet_size' => (int) env('IMAGE_VISION_SHEET_SIZE', 16),
-        'anthropic' => [
-            'api_key' => env('ANTHROPIC_API_KEY'),
-            'model' => env('ANTHROPIC_VISION_MODEL', 'claude-opus-5'),
-        ],
-        'openai' => [
-            'api_key' => env('OPENAI_API_KEY'),
-            'model' => env('OPENAI_VISION_MODEL', 'gpt-6-astra'),
-            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-        ],
     ],
 
     'blogger' => [

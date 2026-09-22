@@ -73,12 +73,6 @@ Canonical defaults to the current URL; JSON‑LD can be injected via @section('j
           <p class="small mb-0">Use Blogger for posts and pull entries into a flat‑file page. Keep editing where your team already works.</p>
         </div>
       </div>
-      <div class="col-md-6 col-lg-3">
-        <div class="h-100 p-3 border bg-white">
-          <div class="d-flex align-items-center mb-2"><i class="bi bi-stars me-2 text-primary"></i><strong>Pixabay Stock</strong></div>
-          <p class="small mb-0">Pick high‑quality stock images via API and embed in pages. Great for fast iteration.</p>
-        </div>
-      </div>
     </div>
     <!-- Forms + Integrations Row -->
     <div class="row g-4 mt-1">

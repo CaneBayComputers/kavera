@@ -130,7 +130,6 @@
                                 <li><a class="dropdown-item" href="/integrations/eventbrite">Eventbrite Events</a></li>
                                 <li><a class="dropdown-item" href="/integrations/flickr">Flickr Galleries</a></li>
                                 <li><a class="dropdown-item" href="/integrations/blogger">Google Blogger</a></li>
-                                <li><a class="dropdown-item" href="/integrations/pixabay">Pixabay Images</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="/integrations/forms">Forms &amp; Webhooks</a></li>
                                 <li><a class="dropdown-item" href="/integrations/mailchimp">Mailchimp</a></li>
