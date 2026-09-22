@@ -483,58 +483,21 @@ Slug and path policy
 Agent guidance
 - Keep `resources/examples` as examples for reference; do not overwrite those when generating a real site.
 - For actual sites, replace the `resources/views` symlink with a real folder, then import posts and refresh the registry.
-- When running Podium in non‑interactive environments, wrap with `script` to provide a pseudo‑TTY (see earlier note).
+- When running Zeltro in non‑interactive environments, wrap with `script` to provide a pseudo‑TTY (see the Zeltro section below).
 
 
 ---
 
-### IMPORTANT: Podium Usage for Users and AI Agents
+### Zeltro (Docker dev platform) — use it when present
 
-If Podium is installed use the `podium art` command instead of `php artisan` as this runs artisan inside of the Docker container for a more version‑targeted execution.
-
-All of the following Podium commands (except `exec` and `exec-root`) should be run from the local project directory (where `docker-compose.yaml` lives); inside the container they execute from `/usr/share/nginx/html`.
-
-Common patterns:
+If this project lives under a Zeltro projects directory (the parent folder's `AGENTS.md` says so, or `command -v zeltro` succeeds), run every PHP/Composer/Artisan/npm command through Zeltro so it executes inside the project's container rather than on the host:
 
 ```bash
-# Laravel Artisan
-podium art app:images-manifest
-
-# PHP CLI (lint, one-off scripts)
-podium php -l app/Console/Commands/BuildImageManifest.php
-
-# Composer (runs with -d /usr/share/nginx/html)
-podium composer install
-
-# WordPress CLI (for WordPress projects)
-podium wp plugin list
-
-# PHPCS (without anymore arguments or options)
-podium phpcs app/Console/Commands/BuildImageManifest.php
-
-# PHPCBF (without anymore arguments or options)
-podium phpcbf app/Console/Commands/BuildImageManifest.php
-
-# PHPMD (without anymore arguments or options)
-podium phpmd app/Console/Commands/BuildImageManifest.php
+zeltro art app:update-content-list      # instead of php artisan ...
+zeltro composer install                 # instead of composer ...
+zeltro php -l app/helpers.php           # instead of php ...
+zeltro phpcs app/helpers.php            # phpcbf / phpmd likewise, no extra options
+zeltro exec <cmd>                       # anything else, no TTY (automation-friendly)
 ```
 
-For any other CLI executable as the developer user (runs from the project root inside the container):
-
-```bash
-podium exec <command> [options]
-```
-
-To run commands as root:
-
-```bash
-podium exec-root <command> [options]
-```
-
-Note for AI agents and CI:
-- When running these commands non‑interactively, wrap them with `script` so Podium receives a pseudo‑TTY, for example:
-
-  ```bash
-  script -q -c "podium art app:images-manifest" /dev/null
-  script -q -c "podium php -l app/Console/Commands/BuildImageManifest.php" /dev/null
-  ```
+Run from the project root. In non-interactive shells wrap the tool-runner commands with `script -q -c "zeltro art ..." /dev/null` so they get a pseudo-TTY. The full command reference and rules are in the parent directory's `AGENTS.md` and `zeltro help`. `podium` is a legacy alias for the same binary.
