@@ -46,7 +46,7 @@ utility classes.
 * Routes are defined in `routes/web.php`.
 * Middleware `VerifyContentAccess` checks the cached page registry (`content_list` in the default cache store).
 * Controller: `PageController` renders approved views.
-* Refresh the page registry whenever content files are added, removed, or renamed:
+* Refresh the page registry whenever content files are added, removed, or renamed (a cleared cache rebuilds it automatically on the next request; this command is for content changes):
 
   ```bash
   php artisan app:update-content-list
@@ -176,7 +176,7 @@ Kavera does not ingest or analyze images itself. **Website Manifestor**, a separ
 php artisan app:website-manifest-import      # zeltro art app:website-manifest-import
 ```
 
-Copies `manifest.json` to `storage/app/private/images/manifest.json` (adding the URL rule below to its notes), `website-brief.md` to `storage/app/private/`, and every optimized variant to `storage/app/public/images/<size>/<id>`. Re-run it after the client changes anything in Website Manifestor. Public URL of an image: `/storage/images/{size}/{id}`; only sizes listed in that image's `available_sizes` exist, and `php artisan storage:link` must have been run.
+Copies `manifest.json` to `storage/app/private/images/manifest.json` (adding the URL rule below to its notes), `website-brief.md` to `storage/app/private/`, and every optimized variant to `storage/app/public/images/<size>/<id>`. The imported images under `storage/app/public/images/` are tracked in git on purpose, so a plain `git pull` deploy carries them; `.website-manifest/` itself is up to each site's `.gitignore`. Re-run the import after the client changes anything in Website Manifestor. Public URL of an image: `/storage/images/{size}/{id}`; only sizes listed in that image's `available_sizes` exist, and `php artisan storage:link` must have been run.
 
 **3) Manifest structure**
 
@@ -251,6 +251,7 @@ Google reCAPTCHA, and message content filters from logic found in
 * POST new HTML forms to `/forms/{form-name}` so they route through `Form::process`.
 * Keep response emails simple - Blade templates in `resources/views/emails` just receive `$formData`.
 * Update `.env` mail targets (`CONTACT_FORM_MAIL_TO`, `CONTACT_FORM_SUCCESS_PAGE`) for destination changes.
+* reCAPTCHA is optional: without `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` the form still works in production and the check is skipped (with a warning in `laravel.log`). Set both keys to enable it.
 
 Email template helper
 - Use `email_table($formData)` (from `app/helpers.php`) to render a clean, inline‑styled HTML table in email bodies.
@@ -285,7 +286,7 @@ This project ships with a JSON‑LD validation command and a simple convention f
 @endsection
 ```
 
-4) Validate JSON‑LD
+4) Validate JSON‑LD (needs the dev dependencies; on a `--no-dev` install the command explains and exits)
 
 - Validate a single file:
 

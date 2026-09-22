@@ -14,6 +14,11 @@ class ValidateJsonLd extends Command
 
     public function handle(): int
     {
+        if (! class_exists(\ML\JsonLD\JsonLD::class) || ! class_exists(\Brick\StructuredData\HTMLReader::class)) {
+            $this->error('JSON-LD validation needs the dev dependencies (ml/json-ld, brick/structured-data). Run "composer install" without --no-dev.');
+            return self::FAILURE;
+        }
+
         $directory = resource_path('views/jsonld');
 
         if (! is_dir($directory)) {

@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use App\Services\ContentRegistry;
 use Symfony\Component\HttpFoundation\Response;
 
 class VerifyContentAccess
@@ -44,14 +44,8 @@ class VerifyContentAccess
             return $next($request);
         }
 
-        $content_list = Cache::get('content_list', []);
-
-        // Older registries were stored as a JSON string; accept both shapes.
-        if (is_string($content_list)) {
-            $content_list = json_decode($content_list, true) ?: [];
-        }
-
-        if (is_array($content_list) && in_array($path, $content_list, true)) {
+        // The registry rebuilds itself if the cache was cleared, so a cache:clear never 404s the site.
+        if (app(ContentRegistry::class)->allows($path)) {
             return $next($request);
         }
 

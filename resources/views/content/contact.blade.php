@@ -59,7 +59,7 @@
 @endsection
 
 @push('script')
-@if(!is_dev())
+@if(!is_dev() && _c('form.recaptcha.site_key'))
 <script src="https://www.google.com/recaptcha/api.js?render={!! _c('form.recaptcha.site_key') !!}"></script>
 <script>
     document.getElementById('contact-form').onsubmit = function (e) {

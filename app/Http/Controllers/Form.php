@@ -191,7 +191,13 @@ class Form extends Controller
         }
 
         // 4) reCAPTCHA (skip in dev)
-        if (!is_dev()) {
+        $siteKey = (string) _c('form.recaptcha.site_key');
+        $secretKey = (string) _c('form.recaptcha.secret_key');
+        if (!is_dev() && ($siteKey === '' || $secretKey === '')) {
+            // Without keys the form still works; reCAPTCHA is simply skipped. Say so in the log.
+            \Illuminate\Support\Facades\Log::warning('reCAPTCHA keys are not set; form "' . $form_name . '" accepted without a bot score.');
+        }
+        if (!is_dev() && $siteKey !== '' && $secretKey !== '') {
             $token = $data['recaptcha'] ?? null;
             $message = $this->recaptchaMessage($token, $ip_address);
             if ($message !== null) {

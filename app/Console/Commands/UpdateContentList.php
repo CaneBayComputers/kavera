@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Services\ContentRegistry;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Cache;
 
 class UpdateContentList extends Command
 {
@@ -25,22 +24,12 @@ class UpdateContentList extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(ContentRegistry $registry): int
     {
-        $content_path = resource_path('views/content');
+        $slugs = $registry->refresh();
 
-        $files = File::allFiles($content_path);
+        $this->info('Content list saved: ' . count($slugs) . ' page(s) registered in the "' . config('cache.default') . '" cache store.');
 
-        foreach ($files as &$file) {
-            $file = $file->getRelativePathname();
-
-            $file = preg_replace('/\.blade\.php$/', '', $file);
-        }
-
-        $files = array_values($files);
-
-        Cache::forever('content_list', $files);
-
-        $this->info('Content list saved: ' . count($files) . ' page(s) registered in the "' . config('cache.default') . '" cache store.');
+        return self::SUCCESS;
     }
 }
