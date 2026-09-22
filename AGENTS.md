@@ -97,8 +97,8 @@ When a user says something like “make me a website” (without enough detail),
 
 3) Use the website brief and image manifest as primary design input
 
-- If `storage/app/private/website-brief.md` exists, read it first. It is the client intake (business facts, brand, pages with purpose and call to action, integrations) written by Website Manifestor.
-- Always consult `storage/app/private/images/manifest.json` when it exists (format below):
+- If `.website-manifest/` exists in the project root, read its `AGENTS.md` and `website-brief.md` first (the client intake written by Website Manifestor) and run `php artisan app:website-manifest-import` so the images are served from `storage/`.
+- Always consult `storage/app/private/images/manifest.json` after the import (format below):
   - Use every image where `provider = "user"`; prefer them for hero and key sections.
   - Honor `usage` (page, section, role) over any guess from the file name; then `orientation`, `aspect_ratio` and `original_path` to decide placement.
   - Use `content_analysis.description` for alt text and its `subjects`, `colors`, `text` and `people` for placement.
@@ -158,22 +158,31 @@ Following these rules should prevent agents from blindly cloning the example sit
 
 ---
 
-### Images and the Image Manifest
+### Images and the Website Manifest
 
-Kavera does not ingest or analyze images itself. That work lives in **Website Manifestor**, a separate desktop app (`CaneBayComputers/website-manifestor`) that runs the client intake, optimizes photos, has a vision model describe them, pulls stock images and exports the result into a Kavera site. Agents read what it produced.
+Kavera does not ingest or analyze images itself. **Website Manifestor**, a separate desktop app (`CaneBayComputers/website-manifestor`), runs the client intake, optimizes photos, has a vision model describe them, pulls stock images, and writes everything into a `.website-manifest/` folder inside the site. Kavera copies from there into `storage/` with one command. Website Manifestor knows nothing about Kavera; the import is Kavera's side of the contract.
 
-**1) What an export puts in the site**
+**1) The `.website-manifest/` folder (client input, never modify it)**
 
-- `storage/app/private/website-brief.md` — the intake in prose. Read it first.
-- `storage/app/private/images/manifest.json` — every image with its metadata (format below).
-- `storage/app/public/images/{size}/{id}` — WebP variants at `1920`, `1280`, `768` and `480` on the long side (never upscaled), `small/` for originals under 480px, `svg/` for SVGs. `id` is `<sha1>.webp` or `<sha1>.svg`.
-- Public URL: `/storage/images/{size}/{id}`. Only sizes listed in an image's `available_sizes` exist; never invent one. `php artisan storage:link` must have been run.
+- `AGENTS.md` — platform-neutral kickoff instructions from Website Manifestor. Read it, then come back to this file for the Kavera specifics below.
+- `website-brief.md` — the intake in prose. Read it before building anything.
+- `manifest.json` — the brief as data (schema `website-manifest/1`, structure below).
+- `originals/<provider>/…` — source images with the client's folder structure kept.
+- `optimized/<size>/<id>` — WebP variants at `1920`, `1280`, `768`, `480`, plus `small/` (originals under 480px) and `svg/`.
 
-**2) Manifest structure**
+**2) Import into the site**
+
+```bash
+php artisan app:website-manifest-import      # zeltro art app:website-manifest-import
+```
+
+Copies `manifest.json` to `storage/app/private/images/manifest.json` (adding the URL rule below to its notes), `website-brief.md` to `storage/app/private/`, and every optimized variant to `storage/app/public/images/<size>/<id>`. Re-run it after the client changes anything in Website Manifestor. Public URL of an image: `/storage/images/{size}/{id}`; only sizes listed in that image's `available_sizes` exist, and `php artisan storage:link` must have been run.
+
+**3) Manifest structure**
 
 ```json
 {
-  "schema": "website-manifestor/1",
+  "schema": "website-manifest/1",
   "project": { "name": "...", "slug": "..." },
   "business": { "name": "...", "tagline": "...", "category": "...", "description": "...", "audience": "...", "goals": [], "differentiators": [], "phone": "...", "email": "...", "address": {}, "service_area": "...", "hours": "...", "social": {} },
   "brand": { "colors": ["deep navy (#1b2a49)"], "fonts": [], "tone": "...", "style_keywords": [], "logo_image_id": "<id>|null", "reference_image_ids": [], "reference_urls": [] },
@@ -203,15 +212,11 @@ Kavera does not ingest or analyze images itself. That work lives in **Website Ma
 
 - `completeness.missing` lists what the client never supplied. Make sensible assumptions for those and say so in your build notes.
 - `content_analysis` is written by an AI vision model: use its `description` for alt text and the rest to choose placement. `people` above zero usually means a portrait or team photo.
-- User images with no `usage` still must be used somewhere; folder names in `original_path` are the remaining hint.
+- Use every `provider = "user"` image. Honor `usage` over guesses; folder names in `original_path` are the remaining hint.
 
-**3) If the site folder has a `.website-manifestor/` folder**
+**4) When there is no `.website-manifest/` folder**
 
-- That is Website Manifestor's working state for this site (its own copy of the manifest, brief and images). The app's Build step copies it into the `storage/` locations above; read those, not the dotfolder. If `storage/app/private/images/manifest.json` is missing but `.website-manifestor/manifest.json` exists, ask the user to press Build in Website Manifestor.
-
-**4) When there is no manifest**
-
-- Ask the user to run Website Manifestor and export into this site, or to drop images under `storage/app/public/images/` and describe them. Do not build a site around images you have not seen.
+- Ask the user to run Website Manifestor on this folder, or to drop images under `storage/app/public/images/` and describe them. Do not build a site around images you have not seen.
 
 ---
 
