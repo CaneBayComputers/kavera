@@ -99,7 +99,7 @@ When a user says something like “make me a website” (without enough detail),
 - Always consult `storage/app/private/images/manifest.json` when generating or refactoring content if exists:
   - Prefer `provider = "user"` images for hero and key sections.
   - Use `orientation`, `aspect_ratio`, and `original_path` to decide placement (hero vs. card vs. background).
-  - Use the first few `foreground_colors` / `background_colors` entries as color cues for backgrounds, accents, or SVG decorations.
+  - Use the colors the user supplied (or colors sampled from their logo and hero images) as cues for backgrounds, accents, or SVG decorations.
 - Also check `storage/app/private/images/layout`:
   - Images here may represent full‑page or section layout concepts (e.g. exports from Photoshop/Illustrator).
   - Directory structure and filenames may hint at intended usage (e.g. `home-hero-layout`, `about-section-02`); respect those hints when mapping to sections.
@@ -128,7 +128,6 @@ When a user says something like “make me a website” (without enough detail),
 - Every `<img>` tag must have a meaningful `alt`:
   - Derive it from:
     - `original_path` (e.g. `my cars/1989 Chevy Cavalier.png` → “1989 Chevy Cavalier in a driveway”).
-    - Rekognition `objects` (e.g. `Car`, `Station Wagon`, `Buggy`, `Person`) to refine the phrasing.
     - Folder structure (e.g. `layout/home-hero-01` suggests “Full‑page hero layout concept for home page”).
   - Never leave empty or generic alts like “image” unless the image is clearly decorative and the layout already conveys the same information.
 
@@ -159,7 +158,7 @@ Following these rules should prevent agents from blindly cloning the example sit
 
 ### Image Ingest, Optimization & Manifest Pipeline
 
-Agents should treat images as a first‑class data source for page generation. This repo now ships with a full ingest + analysis pipeline that collects images from providers, runs AWS Rekognition, optimizes assets, and builds an AI‑friendly manifest.
+Agents should treat images as a first‑class data source for page generation. This repo ships with an ingest pipeline that collects images from providers, optimizes assets, and builds an AI‑friendly manifest.
 
 **1) Where images live**
 
@@ -190,8 +189,6 @@ Agents should treat images as a first‑class data source for page generation. T
 
   ```bash
   php artisan app:images-manifest
-  # Use --rekog to run AWS Rekognition to get image properties
-  # php artisan app:images-manifest --rekog
   ```
 
 - What it scans:
@@ -200,32 +197,7 @@ Agents should treat images as a first‑class data source for page generation. T
   - For `user`:
     - Detects `.zip` archives, extracts them once into `_zip_<uuid>` folders, deletes the original `.zip`, and processes all extracted images.
 
-**4) Rekognition analysis**
-
-- For each image:
-  - Creates a temporary JPEG with a max long side of `1280px` (never upscaling) and sends that to AWS Rekognition.
-  - Uses `RekognitionService` for `detectLabels`, `detectImageProperties`, `detectFaces`, and `detectText`.
-- The condensed Rekognition output is stored per image under:
-
-  ```json
-  "auto_identified_properties_from_aws_rekognition": {
-      "objects": ["Label1", "Label2", "..."],
-      "brightness": "NN%",
-      "sharpness": "NN%",
-      "contrast": "NN%",
-      "foreground_colors": ["color phrase 1 (#rrggbb)", "..."],
-      "background_colors": ["color phrase 1 (#rrggbb)", "..."],
-      "number_of_human_faces": 0,
-      "text_segments": ["TEXT1", "TEXT2", "..."]
-  }
-  ```
-
-- Ordering & thresholds:
-  - `objects` are Rekog labels sorted by confidence (highest first).
-  - `foreground_colors` / `background_colors` are derived from Rekognition’s dominant color data for foreground and background regions (falling back to full-image colors when needed) and converted into human‑readable phrases with hex codes.
-  - `text_segments` are unique, high‑confidence (>95%) text detections sorted by confidence.
-
-**5) WebP optimization & URLs**
+**4) WebP optimization & URLs**
 
 - For each original:
   - If the longest side is `< 480px`:
@@ -248,7 +220,7 @@ Agents should treat images as a first‑class data source for page generation. T
 
     where `{available_size}` is one of the sizes listed in `available_sizes` (or `small` for very small originals).
 
-**6) Manifest structure (AI‑facing)**
+**5) Manifest structure (AI‑facing)**
 
 - Manifest file:
   - Location: `storage/app/private/images/manifest.json`.
@@ -257,7 +229,6 @@ Agents should treat images as a first‑class data source for page generation. T
     ```json
     {
       "notes": [
-        "Rekog objects, colors, and text appear in highest significance order (index 0..N).",
         "Use and utilize all pictures where provider = 'user'.",
         "Adhere to any user image directory structure and file naming to infer intended page usage.",
         "Public image URLs are /storage/images/optimized/{available_size}/{id}."
@@ -273,7 +244,6 @@ Agents should treat images as a first‑class data source for page generation. T
           "original_query_terms": ["sports", "car", "night"],
           "provider_keywords": [...],
           "provider_description": "..." | null,
-          "auto_identified_properties_from_aws_rekognition": { ... },
           "available_sizes": [1920, 1280, 768, 480] // or subset / small-only
         }
       ]
@@ -286,13 +256,13 @@ Agents should treat images as a first‑class data source for page generation. T
     - `original_query_terms` are derived from the search folder name with trailing timestamp‑like tokens stripped.
     - `provider_keywords`/`provider_description` are populated from provider metadata where available (e.g. Pixabay description, Pexels/Unsplash search terms and captions).
   - `user` images:
-    - `original_query_terms` is an empty array; rely on folder structure + Rekog fields and any embedded metadata for semantic hints.
+    - `original_query_terms` is an empty array; rely on folder structure and any embedded metadata for semantic hints.
 
 - Intent:
   - The manifest is not read by Blade at runtime; it exists for AI agents and build tooling to:
     - Discover all available images (especially in `user/`).
-    - Understand orientation, color feel, objects, text, and confidence ordering.
-    - Map images to page sections using folder structure, query terms, and Rekog output when generating or refactoring content templates.
+    - Understand orientation, aspect ratio, and which optimized sizes exist.
+    - Map images to page sections using folder structure and query terms when generating or refactoring content templates.
 
 
 ---

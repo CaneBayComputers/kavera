@@ -43,7 +43,7 @@
         <div class="card h-100 shadow-sm">
           <div class="card-body d-flex flex-column">
             <h5 class="card-title">Pixabay</h5>
-            <p class="card-text flex-grow-1">Pull stock images for use in templates; optionally process with AWS Rekognition for tagging.</p>
+            <p class="card-text flex-grow-1">Pull stock images for use in templates and build a manifest agents can use to place them.</p>
             <a href="/integrations/pixabay" class="stretched-link">Learn more</a>
           </div>
         </div>

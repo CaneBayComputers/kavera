@@ -54,7 +54,6 @@ Everything below syncs into Redis or local storage ahead of time. Templates read
 - 📝 Blogger: public posts import as Blade files with recent, label and monthly archive listings.
 - 🎟️ Eventbrite: events sync into Redis and render through simple helpers.
 - 🖼️ Pixabay, Pexels and Unsplash: search and download stock images from the command line, then build an image manifest that agents use to pick images and write alt text.
-- 👁️ AWS Rekognition: optional image analysis that tags objects, colors, faces and text for the manifest.
 - ✉️ Form email: submissions are validated, filtered and emailed through SMTP.
 - 🗄️ Form storage: optionally save submissions to a database for later review. This is the only feature that touches a database at all.
 - 🔗 Form webhooks: send submissions to Mailchimp, Zapier or Salesforce with explicit field maps.
