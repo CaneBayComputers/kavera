@@ -128,6 +128,7 @@ When a user says something like “make me a website” (without enough detail),
 - Every `<img>` tag must have a meaningful `alt`:
   - Derive it from:
     - `original_path` (e.g. `my cars/1989 Chevy Cavalier.png` → “1989 Chevy Cavalier in a driveway”).
+    - `content_analysis.description` when present (an AI-written caption from `--describe`), refined with its `subjects`, `text` and `people` fields.
     - Folder structure (e.g. `layout/home-hero-01` suggests “Full‑page hero layout concept for home page”).
   - Never leave empty or generic alts like “image” unless the image is clearly decorative and the layout already conveys the same information.
 
@@ -189,6 +190,8 @@ Agents should treat images as a first‑class data source for page generation. T
 
   ```bash
   php artisan app:images-manifest
+  # Also have an AI vision model describe every image (see section 6):
+  # php artisan app:images-manifest --describe
   ```
 
 - What it scans:
@@ -244,7 +247,15 @@ Agents should treat images as a first‑class data source for page generation. T
           "original_query_terms": ["sports", "car", "night"],
           "provider_keywords": [...],
           "provider_description": "..." | null,
-          "available_sizes": [1920, 1280, 768, 480] // or subset / small-only
+          "available_sizes": [1920, 1280, 768, 480], // or subset / small-only
+          "content_analysis": { // only after --describe, otherwise null
+            "description": "A yellow-green BMW coupe parked between silver cars at night.",
+            "subjects": ["sports coupe", "parked cars", "parking lot"],
+            "colors": ["charcoal black (#111716)", "dark gray (#414a4b)"],
+            "text": [],
+            "people": 0,
+            "provider": "anthropic|openai", "model": "...", "analyzed_at": "..."
+          }
         }
       ]
     }
@@ -261,9 +272,18 @@ Agents should treat images as a first‑class data source for page generation. T
 - Intent:
   - The manifest is not read by Blade at runtime; it exists for AI agents and build tooling to:
     - Discover all available images (especially in `user/`).
-    - Understand orientation, aspect ratio, and which optimized sizes exist.
+    - Understand orientation, aspect ratio, which optimized sizes exist, and (after `--describe`) what each image actually shows.
     - Map images to page sections using folder structure and query terms when generating or refactoring content templates.
 
+
+**6) AI content descriptions (optional, recommended)**
+
+- Command: `php artisan app:images-manifest --describe`. Options: `--provider=anthropic|openai` (overrides `IMAGE_VISION_PROVIDER`), `--redescribe` (redo images that already have one), `--sheet-size=N` (images per request).
+- How it works: after WebP generation, the smallest variant of every image lacking `content_analysis` is tiled onto numbered contact sheets (default 16 per sheet, one API request per sheet) and sent to the vision model, which returns one JSON object per cell. Answers are written to `content_analysis` on each manifest entry and survive later re-ingests, so only new images cost anything on the next run.
+- `.env` keys: `IMAGE_VISION_PROVIDER` (`anthropic` default, or `openai`), `IMAGE_VISION_SHEET_SIZE` (16), `ANTHROPIC_API_KEY` + `ANTHROPIC_VISION_MODEL` (`claude-opus-5`), `OPENAI_API_KEY` + `OPENAI_VISION_MODEL` (`gpt-6-astra`). Only the chosen provider's key is required.
+- Fields per image: `description` (one or two sentences, alt-text ready), `subjects` (most important first), `colors` (name plus hex, most dominant first), `text` (readable words as written), `people` (count), plus `provider`, `model`, `analyzed_at`.
+- SVGs are never analyzed (no raster variant). A failed sheet is logged as a warning, the rest continue, and the command exits non-zero; re-run to fill the gaps.
+- Code lives in `app/Services/Vision/`: `ContactSheetBuilder` (GD grid), `VisionPrompt` (shared prompt, JSON schema, parser), `AnthropicVisionProvider`, `OpenAiVisionProvider`, `ImageContentAnalyzer` (batching and cell mapping), `VisionProviderFactory`.
 
 ---
 

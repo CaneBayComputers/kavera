@@ -68,6 +68,22 @@ return [
         'timeout' => env('PEXELS_TIMEOUT', 8),
     ],
 
+    'vision' => [
+        // "anthropic" or "openai"; --provider on app:images-manifest overrides per run.
+        'provider' => env('IMAGE_VISION_PROVIDER', 'anthropic'),
+        // Images tiled per contact sheet (one API request per sheet).
+        'sheet_size' => (int) env('IMAGE_VISION_SHEET_SIZE', 16),
+        'anthropic' => [
+            'api_key' => env('ANTHROPIC_API_KEY'),
+            'model' => env('ANTHROPIC_VISION_MODEL', 'claude-opus-5'),
+        ],
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY'),
+            'model' => env('OPENAI_VISION_MODEL', 'gpt-6-astra'),
+            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        ],
+    ],
+
     'blogger' => [
         'api_key' => env('BLOGGER_API_KEY'),
         'blog_id' => env('BLOGGER_BLOG_ID'),

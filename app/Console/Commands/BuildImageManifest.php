@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Vision\ContactSheetBuilder;
+use App\Services\Vision\ImageContentAnalyzer;
+use App\Services\Vision\VisionProviderFactory;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -13,18 +16,102 @@ class BuildImageManifest extends Command
      *
      * @var string
      */
-    protected $signature = 'app:images-manifest';
+    protected $signature = 'app:images-manifest
+        {--describe : Describe image content with an AI vision model and store it in the manifest}
+        {--provider= : Vision provider for --describe: anthropic or openai (default: IMAGE_VISION_PROVIDER)}
+        {--redescribe : With --describe, re-analyze images that already have a content_analysis}
+        {--sheet-size= : Images per contact sheet sent to the vision model (default: IMAGE_VISION_SHEET_SIZE)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Image ingest + optimization pipeline: WebP variants and an AI-friendly manifest.';
+    protected $description = 'Image ingest + optimization pipeline: WebP variants, an AI-friendly manifest, and optional AI content descriptions.';
 
     public function handle(): int
     {
-        return $this->handleBulkIngest();
+        $code = $this->handleBulkIngest();
+        if ($code !== self::SUCCESS || ! $this->option('describe')) {
+            return $code;
+        }
+
+        return $this->describeImages();
+    }
+
+    /**
+     * Second pass: tile images onto contact sheets, ask the configured vision
+     * provider to describe each cell, and store the answers under content_analysis.
+     */
+    private function describeImages(): int
+    {
+        try {
+            $provider = VisionProviderFactory::make($this->option('provider') ?: null);
+        } catch (\InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+            return self::FAILURE;
+        }
+
+        $sheetSize = (int) ($this->option('sheet-size') ?: config('services.vision.sheet_size', 16));
+        $redescribe = (bool) $this->option('redescribe');
+
+        $state = $this->loadManifestState();
+        $pending = [];
+        foreach ($state['images'] as $index => $entry) {
+            if (! $redescribe && ! empty($entry['content_analysis'])) {
+                continue;
+            }
+            $path = $this->smallestVariantPath($entry);
+            if ($path === null) {
+                continue;
+            }
+            $hint = trim(implode(' ', array_filter([
+                (string) ($entry['provider'] ?? ''),
+                (string) ($entry['original_path'] ?? ''),
+                implode(' ', (array) ($entry['original_query_terms'] ?? [])),
+            ])));
+            $pending[(string) $entry['hash']] = ['path' => $path, 'hint' => $hint, 'index' => $index];
+        }
+
+        if (empty($pending)) {
+            $this->info('Describe: nothing to do (every image already has a content_analysis; use --redescribe to redo).');
+            return self::SUCCESS;
+        }
+
+        $this->info('Describe: ' . count($pending) . ' image(s), ' . $sheetSize . ' per sheet, via ' . $provider->name() . ' (' . $provider->model() . ').');
+
+        $analyzer = new ImageContentAnalyzer($provider, new ContactSheetBuilder(), $sheetSize);
+        $results = $analyzer->analyze(
+            array_map(static fn(array $item): array => ['path' => $item['path'], 'hint' => $item['hint']], $pending),
+            fn(string $message) => $this->logProgress($message),
+        );
+
+        foreach ($results as $hash => $analysis) {
+            $index = $pending[$hash]['index'];
+            $state['images'][$index]['content_analysis'] = $analysis;
+        }
+
+        $this->saveManifestState($state);
+        $this->info('Describe complete. ' . count($results) . ' of ' . count($pending) . ' image(s) described.');
+
+        return count($results) === count($pending) ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Absolute path to the smallest optimized raster variant, or null when none
+     * exists (SVGs and images whose variants failed to generate).
+     */
+    private function smallestVariantPath(array $entry): ?string
+    {
+        $sizes = array_values(array_filter((array) ($entry['available_sizes'] ?? []), 'is_numeric'));
+        if (empty($sizes) || empty($entry['id'])) {
+            return null;
+        }
+        sort($sizes, SORT_NUMERIC);
+        $folder = $this->variantFolderForSize($sizes[0]);
+        $path = storage_path('app/public/images/' . $folder . '/' . $entry['id']);
+
+        return is_file($path) ? $path : null;
     }
 
     /**
@@ -333,6 +420,7 @@ class BuildImageManifest extends Command
             'provider_keywords' => $providerKeywords,
             'provider_description' => $providerDescription,
             'available_sizes' => $sizes,
+            'content_analysis' => is_array($existingEntry) ? ($existingEntry['content_analysis'] ?? null) : null,
         ];
 
         if ($existing !== null) {
@@ -732,6 +820,7 @@ class BuildImageManifest extends Command
         $fresh = [
             'notes' => [
                 'Adhere to any user image directory structure and file naming to infer intended page usage.',
+                'When content_analysis is present it was written by an AI vision model: use its description for alt text and its subjects, colors, text and people fields to choose placement.',
                 'To construct the image paths: images/{available_size}/{id}.',
                 "Use Storage::url('images/...') for all image, asset, and file URLs; do not output /storage/... paths directly.",
                 'The available_sizes array for each image must be strictly adhered to; only choose sizes that are explicitly listed there.',
