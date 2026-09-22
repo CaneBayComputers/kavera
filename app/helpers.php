@@ -383,46 +383,52 @@ if (!function_exists('blogger_label_segment')) {
     }
 }
 
+if (!function_exists('blogger_index')) {
+    /**
+     * The whole Blogger index document written by app:blogger-import:
+     * posts (id => preview), order (ids newest first), labels (slug => name/count/ids),
+     * archives ('YYYY-MM' => ids, newest month first) and recent (top 10 previews).
+     *
+     * @return array{posts:array<string,array<string,mixed>>,order:list<string>,labels:array<string,array{name:string,count:int,ids:list<string>}>,archives:array<string,list<string>>,recent:list<array<string,mixed>>}
+     */
+    function blogger_index(): array
+    {
+        $index = \Illuminate\Support\Facades\Cache::get('blogger:index', []);
+        $index = is_array($index) ? $index : [];
+        return $index + ['posts' => [], 'order' => [], 'labels' => [], 'archives' => [], 'recent' => []];
+    }
+}
+
 if (!function_exists('blogger_recent')) {
     /**
-     * Returns list of recent post previews (id, title, path, published_at, summary).
-     * Falls back to reading the ZSET if the precomputed JSON is unavailable.
+     * Returns list of recent post previews (id, title, path, published_at, summary), newest first.
      *
-     * @param int $limit
      * @return array<int, array<string,mixed>>
      */
     function blogger_recent(int $limit = 10): array
     {
-        $json = \Illuminate\Support\Facades\Redis::get('blogger:recent');
-        if (is_string($json) && $json !== '') {
-            $arr = json_decode($json, true);
-            if (is_array($arr)) {
-                return array_slice($arr, 0, $limit);
-            }
+        $index = blogger_index();
+        if ($limit <= count($index['recent'])) {
+            return array_slice($index['recent'], 0, $limit);
         }
-
-        $ids = \Illuminate\Support\Facades\Redis::zrevrange('blogger:posts:by_published', 0, max(0, $limit - 1)) ?: [];
-        return blogger_previews_by_ids($ids);
+        return blogger_previews_by_ids(array_slice($index['order'], 0, max(0, $limit)));
     }
 }
 
 if (!function_exists('blogger_previews_by_ids')) {
     /**
-     * Resolve preview documents by Blogger post IDs.
+     * Resolve preview documents by Blogger post IDs, keeping the given order.
      *
      * @param array<int, string> $ids
      * @return array<int, array<string,mixed>>
      */
     function blogger_previews_by_ids(array $ids): array
     {
+        $posts = blogger_index()['posts'];
         $out = [];
         foreach ($ids as $id) {
-            $json = \Illuminate\Support\Facades\Redis::get('blogger:post:' . $id);
-            if ($json) {
-                $decoded = json_decode($json, true);
-                if (is_array($decoded)) {
-                    $out[] = $decoded;
-                }
+            if (isset($posts[(string) $id])) {
+                $out[] = $posts[(string) $id];
             }
         }
         return $out;
@@ -431,26 +437,43 @@ if (!function_exists('blogger_previews_by_ids')) {
 
 if (!function_exists('blogger_labels')) {
     /**
-     * Returns an associative array of labels keyed by slug with name and count.
-     * [ slug => ['name' => displayName, 'count' => int] ] sorted by name.
+     * Returns an associative array of labels keyed by slug with name and count, sorted by name.
      *
      * @return array<string, array{name:string,count:int}>
      */
     function blogger_labels(): array
     {
-        $counts = \Illuminate\Support\Facades\Redis::hgetall('blogger:labels') ?: [];
-        $names = \Illuminate\Support\Facades\Redis::hgetall('blogger:labels_display') ?: [];
         $out = [];
-        foreach ($counts as $slug => $count) {
+        foreach (blogger_index()['labels'] as $slug => $label) {
             $out[(string) $slug] = [
-                'name' => (string) ($names[$slug] ?? $slug),
-                'count' => (int) $count,
+                'name' => (string) ($label['name'] ?? $slug),
+                'count' => (int) ($label['count'] ?? 0),
             ];
         }
         uasort($out, static function ($a, $b) {
             return strcasecmp($a['name'], $b['name']);
         });
         return $out;
+    }
+}
+
+if (!function_exists('blogger_label_ids')) {
+    /**
+     * Post IDs carrying a label slug, newest first.
+     *
+     * @return array<int, string>
+     */
+    function blogger_label_ids(string $slug): array
+    {
+        return array_values((array) (blogger_index()['labels'][$slug]['ids'] ?? []));
+    }
+}
+
+if (!function_exists('blogger_label_name')) {
+    function blogger_label_name(string $slug): ?string
+    {
+        $name = blogger_index()['labels'][$slug]['name'] ?? null;
+        return $name !== null ? (string) $name : null;
     }
 }
 
@@ -462,8 +485,19 @@ if (!function_exists('blogger_archives')) {
      */
     function blogger_archives(): array
     {
-        $months = \Illuminate\Support\Facades\Redis::zrevrange('blogger:archives', 0, -1) ?: [];
-        return array_values($months);
+        return array_keys(blogger_index()['archives']);
+    }
+}
+
+if (!function_exists('blogger_archive_ids')) {
+    /**
+     * Post IDs published in a 'YYYY-MM' month, newest first.
+     *
+     * @return array<int, string>
+     */
+    function blogger_archive_ids(string $ym): array
+    {
+        return array_values((array) (blogger_index()['archives'][$ym] ?? []));
     }
 }
 

@@ -2,7 +2,7 @@
 
 **A Laravel website framework built for AI agents.**
 
-Every page is a flat Blade file. Pages need no database, no admin panel and no CMS to fight. An agent reads a folder, writes a template and the page is live. Dynamic content like posts, events and stock images is pulled from services you already use and cached in Redis, so templates render fast and never call an API at request time.
+Every page is a flat Blade file. Pages need no database, no admin panel and no CMS to fight. An agent reads a folder, writes a template and the page is live. Dynamic content like posts, events and stock images is pulled from services you already use and cached locally, so templates render fast and never call an API at request time.
 
 WordPress was built for humans clicking through a dashboard. Kavera was built for agents editing files. If you want an AI to build and maintain a real business site, this is the faster, cleaner and safer place to start.
 
@@ -49,14 +49,14 @@ That is the whole workflow. `AGENTS.md` contains everything the agent needs: set
 
 ## 🔌 Integrations
 
-Everything below syncs into Redis or local storage ahead of time. Templates read the cache and never call an external API on page load.
+Everything below syncs ahead of time into Laravel's cache or local storage. Templates read the cache and never call an external API on page load. The cache is a plain file store out of the box, so Kavera runs with no database server at all. Point it at Redis or a database if you want, but nothing requires it.
 
 - 📝 Blogger: public posts import as Blade files with recent, label and monthly archive listings.
-- 🎟️ Eventbrite: events sync into Redis and render through simple helpers.
+- 🎟️ Eventbrite: events sync into the cache and render through simple helpers.
 - 🖼️ Pixabay, Pexels and Unsplash: search and download stock images from the command line, then build an image manifest that agents use to pick images and write alt text.
 - 🧠 AI image descriptions: one flag tiles your images onto contact sheets and has Claude or GPT describe every one, so agents get real alt text and know which image belongs where.
 - ✉️ Form email: submissions are validated, filtered and emailed through SMTP.
-- 🗄️ Form storage: optionally save submissions to a database for later review. This is the only feature that touches a database at all.
+- 🗄️ Form storage: optionally save submissions to a database for later review. This is the only feature that touches a database at all, and SQLite is enough.
 - 🔗 Form webhooks: send submissions to Mailchimp, Zapier or Salesforce with explicit field maps.
 - 🧠 Google reCAPTCHA: drop in spam protection for any form.
 

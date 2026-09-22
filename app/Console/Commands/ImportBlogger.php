@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Services\BloggerService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Cache;
 
 class ImportBlogger extends Command
 {
@@ -31,8 +31,10 @@ class ImportBlogger extends Command
 
         $items = $blogger->fetchAllPosts($perPage, $limit);
 
-        // Reset indices so counts and lists reflect the current import set
-        $this->resetIndices();
+        // One cached index document replaces the old per-key Redis structures, so any
+        // Laravel cache store (file, database, redis, ...) works.
+        $index = ['posts' => [], 'order' => [], 'labels' => [], 'archives' => [], 'recent' => []];
+        $timestamps = [];
 
         $targetDir = base_path('resources/views/content/' . $base);
         File::ensureDirectoryExists($targetDir);
@@ -56,12 +58,12 @@ class ImportBlogger extends Command
             $this->line('Wrote: content/' . $base . '/' . $slug . '.blade.php');
             $count++;
 
-            // Index to Redis for fast lists
+            // Index for fast lists
             $id = (string) ($post['id'] ?? '');
             $publishedAt = (string) ($post['published_at'] ?? '');
             $ts = strtotime($publishedAt) ?: time();
             $path = '/' . $base . '/' . $slug;
-            $preview = [
+            $index['posts'][$id] = [
                 'id' => $id,
                 'title' => (string) ($post['title'] ?? ''),
                 'url' => (string) ($post['url'] ?? ''),
@@ -71,11 +73,8 @@ class ImportBlogger extends Command
                 'path' => $path,
                 'thumb' => $this->firstImageUrl((string) ($post['content_html'] ?? '')),
             ];
-            Redis::set('blogger:post:' . $id, json_encode($preview, JSON_UNESCAPED_SLASHES));
-            Redis::zadd('blogger:posts:by_published', $ts, $id);
-            $ym = gmdate('Y-m', $ts);
-            Redis::zadd('blogger:archive:' . $ym, $ts, $id);
-            Redis::zadd('blogger:archives', (int) gmdate('Ym', $ts), $ym);
+            $timestamps[$id] = $ts;
+            $index['archives'][gmdate('Y-m', $ts)][] = $id;
 
             $labels = $post['labels'] ?? [];
             if (is_array($labels)) {
@@ -84,57 +83,36 @@ class ImportBlogger extends Command
                     if ($slugLabel === '') {
                         continue;
                     }
-                    Redis::sadd('blogger:label:' . $slugLabel . ':ids', $id);
-                    Redis::hincrby('blogger:labels', $slugLabel, 1);
-                    Redis::hset('blogger:labels_display', $slugLabel, (string) $label);
+                    $index['labels'][$slugLabel] ??= ['name' => (string) $label, 'count' => 0, 'ids' => []];
+                    $index['labels'][$slugLabel]['count']++;
+                    $index['labels'][$slugLabel]['ids'][] = $id;
                 }
             }
         }
 
-        // Maintain a pre-computed recent list (top 10)
-        $ids = Redis::zrevrange('blogger:posts:by_published', 0, 9) ?: [];
-        $recent = [];
-        foreach ($ids as $pid) {
-            $json = Redis::get('blogger:post:' . $pid);
-            if ($json) {
-                $decoded = json_decode($json, true);
-                if (is_array($decoded)) {
-                    $recent[] = $decoded;
-                }
-            }
+        // Newest first everywhere.
+        arsort($timestamps, SORT_NUMERIC);
+        $index['order'] = array_keys($timestamps);
+        $newestFirst = static function (array $ids) use ($timestamps): array {
+            usort($ids, static fn($a, $b) => ($timestamps[$b] ?? 0) <=> ($timestamps[$a] ?? 0));
+            return array_values(array_unique($ids));
+        };
+        foreach ($index['archives'] as $ym => $ids) {
+            $index['archives'][$ym] = $newestFirst($ids);
         }
-        Redis::set('blogger:recent', json_encode($recent, JSON_UNESCAPED_SLASHES));
+        krsort($index['archives'], SORT_STRING);
+        foreach ($index['labels'] as $slugLabel => $label) {
+            $index['labels'][$slugLabel]['ids'] = $newestFirst($label['ids']);
+        }
+        foreach (array_slice($index['order'], 0, 10) as $pid) {
+            $index['recent'][] = $index['posts'][$pid];
+        }
+
+        Cache::forever('blogger:index', $index);
 
         $this->info("Imported {$count} post(s) under content/{$base}");
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Clear label counts/sets and archive/order indices before rebuilding.
-     */
-    private function resetIndices(): void
-    {
-        // Clear label counts and display names
-        Redis::del('blogger:labels');
-        Redis::del('blogger:labels_display');
-
-        // Clear per-label id sets
-        $labelSets = Redis::keys('blogger:label:*:ids') ?: [];
-        if (!empty($labelSets)) {
-            Redis::del($labelSets);
-        }
-
-        // Clear archive buckets and month list
-        $archiveBuckets = Redis::keys('blogger:archive:*') ?: [];
-        if (!empty($archiveBuckets)) {
-            Redis::del($archiveBuckets);
-        }
-        Redis::del('blogger:archives');
-
-        // Clear ordering and recent cache
-        Redis::del('blogger:posts:by_published');
-        Redis::del('blogger:recent');
     }
 
     private function deriveSlug(array $post): string

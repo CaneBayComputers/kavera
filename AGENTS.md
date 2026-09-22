@@ -12,8 +12,9 @@ Kavera is a Laravel-based website framework that uses flat-file Blade templates
 for static pages and retrieves dynamic content from external services. Static
 pages are located in `/resources/views/content` and can be created, edited, or
 removed directly. Dynamic content can be periodically pulled from integrated
-services and stored in Redis so that templates can access it without calling
-external APIs at runtime.
+services and stored in the Laravel cache (file store by default; Redis or a
+database are optional) so that templates can access it without calling
+external APIs at runtime. Kavera needs no database server to run.
 
 Kavera does not use a traditional CMS. There is no admin panel for page
 creation. The primary method for defining site structure is creating or editing
@@ -21,16 +22,14 @@ Blade files, partial components and templates manually or via an AI agent.
 
 Dynamic content sources included and pre-built in this project:
 - Blogger: Used for posts, articles, news, press releases, staff lists, or any
-  repeatable content collection. Pulled through the Blogger API into Redis.
-- Eventbrite: Event data is fetched and normalized into Redis for display on
+  repeatable content collection. Pulled through the Blogger API into the cache.
+- Eventbrite: Event data is fetched and normalized into the cache for display on
   event or calendar pages.
-- Flickr: Albums and photo sets are synchronized and cached in Redis for use in
-  gallery components.
 - Pixabay, Pexels and Unsplash Search: Images can be pulled via CLI command and
   stored locally for use in page templates.
 
 All static content is edited in Blade templates. All dynamic collections are
-accessed from Redis. Do not attempt to modify content through a CMS interface,
+read from the cache. Do not attempt to modify content through a CMS interface,
 as none exists. Keep HTML structure semantic and rely on existing layout and
 utility classes.
 
@@ -43,9 +42,9 @@ utility classes.
 
 * Blade templates in `resources/views/content` correspond to URL slugs.
 * Routes are defined in `routes/web.php`.
-* Middleware `VerifyContentAccess` checks the Redis page registry.
+* Middleware `VerifyContentAccess` checks the cached page registry (`content_list` in the default cache store).
 * Controller: `PageController` renders approved views.
-* Refresh Redis content list whenever content files are added, removed, or name is modified:
+* Refresh the page registry whenever content files are added, removed, or renamed:
 
   ```bash
   php artisan app:update-content-list
@@ -384,37 +383,14 @@ Keep titles concise (50–60 chars ideal) and descriptions ~155 chars. Provide `
 
 ---
 
-### PHP Syntax and Code Quality Checks
-
-After updating any PHP file, the agent **must** verify syntax, formatting, and overall code health using the following commands on the specific file changed:
-
-```bash
-# 0. Quick syntax check (lint only)
-php -l <file_path>
-
-# 1. Auto-fix formatting issues (PSR-12)
-phpcbf --standard=~/.config/phpcs-ruleset.xml <file_path>
-
-# 2. Verify style and report remaining issues
-phpcs --standard=~/.config/phpcs-ruleset.xml -w <file_path>
-
-# 3. Detect unused variables and code smells
-phpmd <file_path> text ~/.config/phpmd.xml
-# If no user ruleset exists, fall back to categories:
-# phpmd <file_path> text codesize,unusedcode,naming
-```
-
-
----
-
 ### Blogger / "Blog" System
 
-Kavera treats blogging as "imported flat‑files" plus lightweight Redis indices. Agents should understand this model to generate optional, "blog type" pages, lists, and navigation. This project is not intended to be a "blog" per-se however the integration allows the user to use Blogger any means they see fit. This could also be used for, not limited to: press releases, news articles, product pages, general blog, etc.
+Kavera treats blogging as "imported flat‑files" plus a lightweight cached index. Agents should understand this model to generate optional, "blog type" pages, lists, and navigation. This project is not intended to be a "blog" per-se however the integration allows the user to use Blogger any means they see fit. This could also be used for, not limited to: press releases, news articles, product pages, general blog, etc.
 
 Key concepts
 - Import, don’t fetch at request time: posts import as Blade files under a configurable base (default `blog`).
 - Slugs are cleansed by the same regex used for content routing (see `config/content.php`).
-- Redis stores only indices (recent list, label membership, archives) and compact previews; NOT full HTML bodies.
+- The cache stores only one index document (recent list, label membership, archives, compact previews); NOT full HTML bodies. Any Laravel cache store works.
 
 Configuration (`config/services.php` → `services.blogger`)
 - `content_base` (env `BLOGGER_CONTENT_BASE`, default `blog`) – base folder under `resources/views/content` where posts are written
@@ -423,12 +399,12 @@ Configuration (`config/services.php` → `services.blogger`)
 - `label_segment` (env `BLOGGER_LABEL_SEGMENT`, default `labels`) – URL segment for label listings
 
 Routing (added in `routes/web.php`)
-- `/<base>` → recent posts (from Redis)
+- `/<base>` → recent posts (from the cached index)
 - `/<base>/<label_segment>/<label>` → posts with label (newest first)
 - `/<base>/<YYYY>/<MM>` → monthly archive
 Middleware `VerifyContentAccess` allows these dynamic routes to pass through.
 
-Import command (Blogger → Blade files + Redis indices)
+Import command (Blogger → Blade files + cached index)
 - Import and overwrite posts as Blade files, never delete old ones:
 
 ```bash
@@ -440,16 +416,17 @@ What it does
 - Writes each post to `resources/views/content/<base>/<slug>.blade.php`.
 - Strips `.html/.htm` from Blogger URLs before slug cleansing.
 - Generates `.gitignore` in `resources/views/content/<base>` so generated posts aren’t committed; keep `index.blade.php` under version control for customization.
-- Builds Redis indices:
-  - `blogger:post:<id>` – JSON preview {id,title,url,published_at,summary,slug,path,thumb}
-  - `blogger:posts:by_published` – ZSET
-  - `blogger:label:<slug>:ids` – SET membership
-  - `blogger:labels` – HASH counts, `blogger:labels_display` – display names
-  - `blogger:archive:YYYY-MM` – ZSET per month, `blogger:archives` – ZSET of months
-  - `blogger:recent` – precomputed JSON array (top 10)
+- Writes one cache entry, `blogger:index`, holding:
+  - `posts` – id → preview {id,title,url,published_at,summary,slug,path,thumb}
+  - `order` – post ids, newest first
+  - `labels` – slug → {name, count, ids (newest first)}
+  - `archives` – `YYYY-MM` → ids (newest month first)
+  - `recent` – the top 10 previews, precomputed
+  Read it through the helpers below (or `blogger_index()` for the raw document); never assume a Redis-specific structure.
 
 Helpers (use in templates/layouts)
 - `blogger_recent($n = 10)` – array of recent previews
+- `blogger_label_ids($slug)`, `blogger_archive_ids($ym)`, `blogger_label_name($slug)` – lookups used by `BlogController`
 - `blogger_labels()` – [slug => {name,count}] sorted by name
 - `blogger_archives()` – ["YYYY-MM", ...] newest first
 - `blogger_label_url($slug)`, `blogger_archive_url($ym)` – build links
