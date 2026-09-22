@@ -29,12 +29,6 @@ Dynamic content sources included and pre-built in this project:
 - Pixabay, Pexels and Unsplash Search: Images can be pulled via CLI command and
   stored locally for use in page templates.
 
-The "Agent Briefing Wizard" is a CLI command that gathers project details,
-colors, pages, keywords, organization information, and design references. The
-output is a structured prompt for an AI assistant to use when generating page
-content or the entire site. Use of an AI agent is optional; manual editing is
-fully supported.
-
 All static content is edited in Blade templates. All dynamic collections are
 accessed from Redis. Do not attempt to modify content through a CMS interface,
 as none exists. Keep HTML structure semantic and rely on existing layout and
@@ -332,9 +326,10 @@ Email template helper
 
 This project ships with a JSON‑LD validation command and a simple convention for per‑page schema. Schema markup should be generated whenever possible and included at the bottom of the content page. An example can be found in `resources/examples/content/index.blade.php`. Follow these steps to add or update JSON‑LD.
 
-1) Base schema data from `storage/app/private/agent-brief.txt`
+1) Gather the base schema data from the user
 
-- If this file does not exist demand for user to run `php artisan app:agent-brief`
+- Organization or person name, canonical site URL, logo, address, phone, email, social profile URLs, and business hours where applicable.
+- If the user has not supplied these, ask for them before authoring; do not invent contact details.
 
 2) Author the JSON‑LD file
 

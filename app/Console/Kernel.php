@@ -13,7 +13,6 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        \App\Console\Commands\GenerateAgentBrief::class,
         \App\Console\Commands\ShowFormSubmission::class,
         \App\Console\Commands\DumpBlogger::class,
         \App\Console\Commands\ImportBlogger::class,
