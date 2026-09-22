@@ -205,7 +205,11 @@ Kavera does not ingest or analyze images itself. That work lives in **Website Ma
 - `content_analysis` is written by an AI vision model: use its `description` for alt text and the rest to choose placement. `people` above zero usually means a portrait or team photo.
 - User images with no `usage` still must be used somewhere; folder names in `original_path` are the remaining hint.
 
-**3) When there is no manifest**
+**3) If the site folder has a `.website-manifestor/` folder**
+
+- That is Website Manifestor's working state for this site (its own copy of the manifest, brief and images). The app's Build step copies it into the `storage/` locations above; read those, not the dotfolder. If `storage/app/private/images/manifest.json` is missing but `.website-manifestor/manifest.json` exists, ask the user to press Build in Website Manifestor.
+
+**4) When there is no manifest**
 
 - Ask the user to run Website Manifestor and export into this site, or to drop images under `storage/app/public/images/` and describe them. Do not build a site around images you have not seen.
 
