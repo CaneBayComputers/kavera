@@ -6,7 +6,6 @@ use App\Mail\Form as MailForm;
 use App\Models\FormSubmission;
 use ElFactory\IpApi\IpApi;
 use Exception;
-use Faker\Generator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -20,7 +19,7 @@ use Jenssegers\Agent\Agent;
 
 class Form extends Controller
 {
-    public function process(Request $request, Agent $agent, Generator $faker, string $form_name): RedirectResponse
+    public function process(Request $request, Agent $agent, string $form_name): RedirectResponse
     {
         $form = _c('form.forms.' . $form_name);
         if (!$form) {
@@ -32,14 +31,7 @@ class Form extends Controller
 
 
         // Dev: generate a non-private/non-reserved fake IP; Prod: real client IP
-        if (is_dev()) {
-            $filter_flag = FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE;
-            do {
-                $ip_address = $faker->ipv4();
-            } while (!filter_var($ip_address, FILTER_VALIDATE_IP, $filter_flag));
-        } else {
-            $ip_address = $request->ip();
-        }
+        $ip_address = is_dev() ? $this->fakePublicIp() : $request->ip();
 
         // Consolidated bot/abuse checks (UA, links, rate limit, recaptcha)
         $response = $this->looksAutomated($form_data, $agent, $form_name, $ip_address);
@@ -110,6 +102,24 @@ class Form extends Controller
             $resp = $resp->withFragment($fragment);
         }
         return $resp->with('success', true);
+    }
+
+    /**
+     * A random public IPv4 for local testing of the IP lookup and rate limiter.
+     * Faker is a dev dependency and production installs with --no-dev, so it
+     * must never be a hard requirement here: type-hinting it in process()
+     * made every production form 500 before the controller body ran.
+     */
+    private function fakePublicIp(): string
+    {
+        $flags = FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE;
+        $faker = class_exists(\Faker\Factory::class) ? \Faker\Factory::create() : null;
+
+        do {
+            $ip = $faker ? $faker->ipv4() : long2ip(random_int(0x01000000, 0xDFFFFFFF));
+        } while (!filter_var($ip, FILTER_VALIDATE_IP, $flags));
+
+        return $ip;
     }
 
     private function resolveSuccessTarget(string $success): array
