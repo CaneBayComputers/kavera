@@ -12,7 +12,7 @@ class MailchimpAdapter implements FormAdapter
         // Parameters are part of the interface; unused for Mailchimp payload shape.
         unset($formName, $submissionId);
         $opts   = (array) ($context['options'] ?? []);
-        $status = (string) ($opts['status'] ?? env('MAILCHIMP_STATUS', 'subscribed'));
+        $status = (string) ($opts['status'] ?? config('services.mailchimp.status', 'subscribed'));
 
         // Resolve email strictly via field_map['EMAIL'] when provided
         $email = '';
@@ -81,12 +81,11 @@ class MailchimpAdapter implements FormAdapter
     {
         $opts = (array) ($context['options'] ?? []);
 
-        $apiKey = (string) ($opts['api_key'] ?? env('MAILCHIMP_API_KEY', ''));
+        $apiKey = (string) ($opts['api_key'] ?? config('services.mailchimp.api_key', ''));
         $listId = (string) (
             $opts['audience_id']
                 ?? $opts['list_id']
-                ?? env('MAILCHIMP_AUDIENCE_ID')
-                ?? env('MAILCHIMP_LIST_ID')
+                ?? config('services.mailchimp.audience_id')
                 ?? ''
         );
 
@@ -132,12 +131,11 @@ class MailchimpAdapter implements FormAdapter
             $out['url'] = $url;
         }
 
-        // Optional follow-up: add tags if provided (array) or via env per form
+        // Optional follow-up: add tags if provided (array) or via config('services.mailchimp.tags.<form>')
         $tags = $opts['tags'] ?? [];
         if ((empty($tags) || !is_array($tags)) && !empty($context['form_name'])) {
-            $formKey = strtoupper(preg_replace('~[^A-Za-z0-9]+~', '_', (string) $context['form_name']));
-            $envKey = 'MAILCHIMP_' . $formKey . '_TAGS';
-            $envVal = env($envKey, '');
+            $formKey = strtolower(preg_replace('~[^A-Za-z0-9]+~', '_', (string) $context['form_name']));
+            $envVal = config('services.mailchimp.tags.' . $formKey, '');
             if (is_string($envVal) && $envVal !== '') {
                 $tags = array_values(array_filter(array_map(static function ($s) {
                     return trim((string) $s);

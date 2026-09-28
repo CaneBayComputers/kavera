@@ -38,12 +38,11 @@ class MailchimpTagsAdapter implements FormAdapter
     {
         $opts = (array) ($context['options'] ?? []);
 
-        $apiKey = (string) ($opts['api_key'] ?? env('MAILCHIMP_API_KEY', ''));
+        $apiKey = (string) ($opts['api_key'] ?? config('services.mailchimp.api_key', ''));
         $listId = (string) (
             $opts['audience_id']
                 ?? $opts['list_id']
-                ?? env('MAILCHIMP_AUDIENCE_ID')
-                ?? env('MAILCHIMP_LIST_ID')
+                ?? config('services.mailchimp.audience_id')
                 ?? ''
         );
 

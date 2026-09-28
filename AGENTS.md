@@ -64,6 +64,7 @@ utility classes.
   * PascalCase classes
   * camelCase methods
 * Maintain generous blank lines for readability; preserve spacing in edits.
+* Never call `env()` outside `config/*.php`. After `php artisan config:cache` (every production deploy) `env()` returns null everywhere else, so helpers, services, adapters and views must read `config('...')` (add a key under `config/services.php` when one is missing).
 
 
 ---

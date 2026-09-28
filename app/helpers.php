@@ -111,14 +111,17 @@ function cdn($url = '')
     $original_url = $url;
     $path = ltrim($url, '/');
 
-    $bucket = env('AWS_BUCKET');
+    // Read through config, never env(): once `php artisan config:cache` has run
+    // (every production deploy), env() returns null outside config files, and
+    // this silently served local paths instead of the S3 bucket.
+    $bucket = config('filesystems.disks.s3.bucket');
 
     if (empty($bucket)) {
         return $original_url;
     }
 
-    $region = env('AWS_DEFAULT_REGION', 'us-east-1');
-    $use_path_style = env('AWS_USE_PATH_STYLE_ENDPOINT', false);
+    $region = config('filesystems.disks.s3.region') ?: 'us-east-1';
+    $use_path_style = config('filesystems.disks.s3.use_path_style_endpoint', false);
 
     if ($use_path_style) {
         $base_url = sprintf('https://s3.%s.amazonaws.com/%s', $region, $bucket);

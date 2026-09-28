@@ -50,6 +50,26 @@ return [
         'expand' => env('EVENTBRITE_EXPAND', 'venue,logo,organizer'),
     ],
 
+    // Form webhook adapters read these through config() so they survive config:cache.
+    'mailchimp' => [
+        'api_key' => env('MAILCHIMP_API_KEY'),
+        'audience_id' => env('MAILCHIMP_AUDIENCE_ID', env('MAILCHIMP_LIST_ID')),
+        'status' => env('MAILCHIMP_STATUS', 'subscribed'),
+        // Comma-separated tags per form name, e.g. 'contact' => env('MAILCHIMP_CONTACT_TAGS')
+        'tags' => [
+            'contact' => env('MAILCHIMP_CONTACT_TAGS', ''),
+            'signup' => env('MAILCHIMP_SIGNUP_TAGS', ''),
+        ],
+    ],
+
+    'salesforce' => [
+        'base_url' => env('SALESFORCE_BASE_URL'),
+        'api_version' => env('SALESFORCE_API_VERSION', 'v59.0'),
+        'object' => env('SALESFORCE_OBJECT', 'Lead'),
+        'access_token' => env('SALESFORCE_ACCESS_TOKEN'),
+        'default_company' => env('SALESFORCE_DEFAULT_COMPANY', 'Unknown'),
+    ],
+
     'flickr' => [
         // Public read access only needs the API key; FLICKR_USER_ID is an NSID (12345678@N01) or username.
         'api_key' => env('FLICKR_API_KEY'),

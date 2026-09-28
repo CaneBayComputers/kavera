@@ -42,7 +42,7 @@ class SalesforceAdapter implements FormAdapter
             $payload['LastName'] = 'Unknown';
         }
         if (!isset($payload['Company']) || $payload['Company'] === null || $payload['Company'] === '') {
-            $payload['Company'] = env('SALESFORCE_DEFAULT_COMPANY', 'Unknown');
+            $payload['Company'] = config('services.salesforce.default_company', 'Unknown');
         }
 
         return $payload;
@@ -53,10 +53,10 @@ class SalesforceAdapter implements FormAdapter
         $opts = (array) ($context['options'] ?? []);
 
         // Prefer configured base URL + API version + object to compute the endpoint
-        $baseUrl    = (string) ($opts['base_url'] ?? env('SALESFORCE_BASE_URL', ''));
-        $apiVersion = (string) ($opts['api_version'] ?? env('SALESFORCE_API_VERSION', 'v59.0'));
-        $object     = (string) ($opts['object'] ?? env('SALESFORCE_OBJECT', 'Lead'));
-        $token      = (string) ($opts['access_token'] ?? env('SALESFORCE_ACCESS_TOKEN', ''));
+        $baseUrl    = (string) ($opts['base_url'] ?? config('services.salesforce.base_url', ''));
+        $apiVersion = (string) ($opts['api_version'] ?? config('services.salesforce.api_version', 'v59.0'));
+        $object     = (string) ($opts['object'] ?? config('services.salesforce.object', 'Lead'));
+        $token      = (string) ($opts['access_token'] ?? config('services.salesforce.access_token', ''));
 
         $headers = [];
         if ($token !== '') {
