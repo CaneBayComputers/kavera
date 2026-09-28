@@ -54,7 +54,7 @@ class Form extends Controller
         // Generate a submission ID for downstream usage
         $submission_id = $this->generateSubmissionId();
 
-        unset($form_data['token'], $form_data['recaptcha']);
+        unset($form_data['token'], $form_data['_token'], $form_data['recaptcha'], $form_data['g-recaptcha-response']);
         unset($user_fields['token'], $user_fields['_token'], $user_fields['recaptcha'], $user_fields['g-recaptcha-response']);
 
         // Persist form submission before any emailing or webhooks
@@ -174,8 +174,9 @@ class Form extends Controller
 
     private function looksAutomated(array $data, Agent $agent, string $form_name, string $ip_address): ?string
     {
-        // 1) User-Agent heuristic
-        if (($agent->deviceType() ?? '') === 'Robot') {
+        // 1) User-Agent heuristic. isRobot() uses the crawler list; deviceType()
+        //    returns lowercase "robot" and prefers "desktop", so it never matched.
+        if ($agent->isRobot()) {
             return 'Device type is robot';
         }
 

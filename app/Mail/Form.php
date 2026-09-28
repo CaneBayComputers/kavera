@@ -5,6 +5,7 @@ namespace App\Mail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -33,8 +34,17 @@ class Form extends Mailable
      */
     public function envelope(): Envelope
     {
+        // Reply-To the submitter when the form carried a valid email, so a reply
+        // from the inbox reaches them instead of the site's no-reply address.
+        $email = $this->formData['email'] ?? null;
+        $name = (string) ($this->formData['name'] ?? $this->formData['first_name'] ?? '');
+        $replyTo = is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL)
+            ? [new Address($email, $name)]
+            : [];
+
         return new Envelope(
             subject: $this->subject,
+            replyTo: $replyTo,
         );
     }
 
