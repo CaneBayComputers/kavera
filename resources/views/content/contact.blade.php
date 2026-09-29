@@ -25,7 +25,7 @@
                 @endif
 
                 {{-- Field names must match the rules for the "contact" form in config/form.php. --}}
-                <form action="/forms/contact" method="post" id="contact-form" class="row g-3">
+                <form action="/forms/contact" method="post" id="contact-form" class="row g-3" data-kavera-form>
                     @csrf
                     <div class="col-md-6">
                         <label for="first_name" class="form-label">First name</label>
@@ -59,18 +59,5 @@
 @endsection
 
 @push('script')
-@if(!is_dev() && _c('form.recaptcha.site_key'))
-<script src="https://www.google.com/recaptcha/api.js?render={!! _c('form.recaptcha.site_key') !!}"></script>
-<script>
-    document.getElementById('contact-form').onsubmit = function (e) {
-        grecaptcha.ready(function () {
-            grecaptcha.execute('{!! _c('form.recaptcha.site_key') !!}', { action: 'submit' }).then(function (token) {
-                document.getElementById('recaptcha').value = token;
-                e.target.submit();
-            });
-        });
-        return false;
-    };
-</script>
-@endif
+    @include('partials.form-script')
 @endpush

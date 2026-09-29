@@ -259,6 +259,15 @@ Google reCAPTCHA, and message content filters from logic found in
 * Keep response emails simple - Blade templates in `resources/views/emails` just receive `$formData`.
 * Update `.env` mail targets (`CONTACT_FORM_MAIL_TO`, `CONTACT_FORM_SUCCESS_PAGE`) for destination changes.
 * reCAPTCHA is optional: without `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` the form still works in production and the check is skipped (with a warning in `laravel.log`). Set both keys to enable it.
+* **Every form uses the submit helper.** Add `data-kavera-form` to the `<form>`, keep the hidden `<input name="recaptcha">`, and include the partial once per page:
+
+  ```blade
+  @push('script')
+      @include('partials.form-script')
+  @endpush
+  ```
+
+  The partial loads Google's reCAPTCHA script when a site key is configured (never in local dev) and `public/js/kavera-form.js`, which disables the button and shows "Sending…", fetches a token with an 8 second limit, and submits either way. The server then answers with a visitor-friendly message when the token is missing or the score is low, so a blocked or hanging reCAPTCHA never leaves a dead Send button. Never wire `grecaptcha.execute` by hand in a page. Optional form attributes: `data-sending-label`, `data-recaptcha-timeout` (ms).
 
 Email template helper
 - Use `email_table($formData)` (from `app/helpers.php`) to render a clean, inline‑styled HTML table in email bodies.

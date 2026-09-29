@@ -25,7 +25,7 @@
             </div>
             @endif
             <h2>Contact Us</h2>
-            <form action="/forms/contact" id="contact-form" method="post">
+            <form action="/forms/contact" id="contact-form" method="post" data-kavera-form>
                 @csrf
                 <div class="mb-3">
                     <label for="firstName" class="form-label">First Name</label>
@@ -97,24 +97,5 @@
 @endsection
 
 @push('script')
-
-@if(!is_dev() && _c('form.recaptcha.site_key'))
-<script src="https://www.google.com/recaptcha/api.js?render={!! _c('form.recaptcha.site_key') !!}"></script>
-
-<script>
-
-document.getElementById('contact-form').onsubmit = function(e) {
-    grecaptcha.ready(function() {
-        grecaptcha.execute('{!! _c('form.recaptcha.site_key') !!}', {action: 'submit'}).then(function(token) {
-            document.getElementById("recaptcha").value = token;
-            e.target.submit();
-        });
-    });
-    return false;
-};
-
-@endif
-
-</script>
-
+    @include('partials.form-script')
 @endpush

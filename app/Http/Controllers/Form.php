@@ -175,7 +175,7 @@ class Form extends Controller
 
         $count = (int) Cache::get($key);
         if (!is_dev() && $count >= _c('form.ip_max_attempts_per_timeframe')) {
-            return 'Too many attempts';
+            return self::MSG_TOO_MANY;
         }
 
         Cache::increment($key);
@@ -187,12 +187,12 @@ class Form extends Controller
         // 1) User-Agent heuristic. isRobot() uses the crawler list; deviceType()
         //    returns lowercase "robot" and prefers "desktop", so it never matched.
         if ($agent->isRobot()) {
-            return 'Device type is robot';
+            return self::MSG_ROBOT;
         }
 
         // 2) Message contains links
         if (!empty($data['message']) && preg_match('~https?://~i', $data['message'])) {
-            return 'Please remove links';
+            return self::MSG_LINKS;
         }
 
         // 3) IP rate limiting
@@ -206,7 +206,7 @@ class Form extends Controller
         $secretKey = (string) _c('form.recaptcha.secret_key');
         if (!is_dev() && ($siteKey === '' || $secretKey === '')) {
             // Without keys the form still works; reCAPTCHA is simply skipped. Say so in the log.
-            \Illuminate\Support\Facades\Log::warning('reCAPTCHA keys are not set; form "' . $form_name . '" accepted without a bot score.');
+            Log::warning('reCAPTCHA keys are not set; form "' . $form_name . '" accepted without a bot score.');
         }
         if (!is_dev() && $siteKey !== '' && $secretKey !== '') {
             $token = $data['recaptcha'] ?? null;
@@ -219,10 +219,25 @@ class Form extends Controller
         return null; // looks fine
     }
 
+    /**
+     * Messages shown to the visitor. The technical reason goes to the log.
+     */
+    private const MSG_ROBOT = 'Our spam check flagged your browser as automated. Please try again, or contact us another way.';
+    private const MSG_LINKS = 'Please remove links from your message and try again.';
+    private const MSG_TOO_MANY = 'Too many attempts. Please wait a moment and try again.';
+    private const MSG_RECAPTCHA_UNAVAILABLE = "We couldn't run our spam check. Your browser or an extension may be blocking Google reCAPTCHA. Please allow it and try again, or contact us another way.";
+    private const MSG_RECAPTCHA_LOW_SCORE = 'Our spam check flagged this as automated. Please try again, or contact us another way.';
+
     private function recaptchaMessage(?string $token, string $ip_address): ?string
     {
+        // No token: the reCAPTCHA script was blocked, timed out, or the form has no hidden field.
+        if ($token === null || trim($token) === '') {
+            Log::warning('reCAPTCHA: no token submitted (script blocked or timed out in the browser).', ['ip' => $ip_address]);
+            return self::MSG_RECAPTCHA_UNAVAILABLE;
+        }
+
         try {
-            $response = Http::timeout(2)
+            $response = Http::timeout(3)
                 ->asForm()
                 ->post(_c('form.recaptcha.url'), [
                     'secret'   => _c('form.recaptcha.secret_key'),
@@ -230,16 +245,21 @@ class Form extends Controller
                     'remoteip' => $ip_address,
                 ])
                 ->json();
+        } catch (\Throwable $e) {
+            // Google unreachable from the server: not the visitor's fault, but we cannot vouch for them either.
+            Log::warning('reCAPTCHA: siteverify request failed.', ['ip' => $ip_address, 'error' => $e->getMessage()]);
+            return self::MSG_RECAPTCHA_UNAVAILABLE;
+        }
 
-            if (!isset($response['score'])) {
-                throw new Exception('Recaptcha score returned blank');
-            }
+        if (!is_array($response) || !isset($response['score']) || !is_numeric($response['score'])) {
+            // Bad or expired token, wrong secret, wrong domain: Google answers without a score.
+            Log::warning('reCAPTCHA: siteverify returned no score.', ['ip' => $ip_address, 'response' => $response]);
+            return self::MSG_RECAPTCHA_UNAVAILABLE;
+        }
 
-            if ($response['score'] < _c('form.recaptcha.threshold')) {
-                throw new Exception('Request appears automated');
-            }
-        } catch (Exception $e) {
-            return $e->getMessage();
+        if ((float) $response['score'] < (float) _c('form.recaptcha.threshold')) {
+            Log::info('reCAPTCHA: score below threshold.', ['ip' => $ip_address, 'score' => $response['score']]);
+            return self::MSG_RECAPTCHA_LOW_SCORE;
         }
 
         return null;
