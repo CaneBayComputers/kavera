@@ -21,35 +21,35 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{{ trim($__title) !== '' ? $__title : config('app.name') }}</title>
         @if(trim($__description) !== '')
-            <meta name="description" content="{{ e($__description) }}">
+            <meta name="description" content="{{ $__description }}">
         @endif
         <link rel="canonical" href="{{ $__canonical }}">
         <meta name="robots" content="index,follow">
 
         <!-- Open Graph -->
-        <meta property="og:title" content="{{ e(trim($__title) !== '' ? $__title : config('app.name')) }}">
+        <meta property="og:title" content="{{ trim($__title) !== '' ? $__title : config('app.name') }}">
         @if(trim($__description) !== '')
-            <meta property="og:description" content="{{ e($__description) }}">
+            <meta property="og:description" content="{{ $__description }}">
         @endif
         <meta property="og:type" content="website">
         <meta property="og:url" content="{{ $__canonical }}">
         @if(!empty($__image))
             <meta property="og:image" content="{{ $__image }}">
             @if(!empty($__imageAlt))
-                <meta property="og:image:alt" content="{{ e($__imageAlt) }}">
+                <meta property="og:image:alt" content="{{ $__imageAlt }}">
             @endif
         @endif
 
         <!-- Twitter -->
         <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="{{ e(trim($__title) !== '' ? $__title : config('app.name')) }}">
+        <meta name="twitter:title" content="{{ trim($__title) !== '' ? $__title : config('app.name') }}">
         @if(trim($__description) !== '')
-            <meta name="twitter:description" content="{{ e($__description) }}">
+            <meta name="twitter:description" content="{{ $__description }}">
         @endif
         @if(!empty($__image))
             <meta name="twitter:image" content="{{ $__image }}">
             @if(!empty($__imageAlt))
-                <meta name="twitter:image:alt" content="{{ e($__imageAlt) }}">
+                <meta name="twitter:image:alt" content="{{ $__imageAlt }}">
             @endif
         @endif
 
