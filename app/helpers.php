@@ -9,6 +9,9 @@ function email_table(array $input, array $opts = []): string
         'font_family'   => 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
         'label_width'   => '28%',
         'value_width'   => '72%',
+        // Visitor metadata nested by the form controller, rendered after the submitted fields.
+        'meta_key'      => \App\Http\Controllers\Form::VISITOR_KEY,
+        'meta_heading'  => 'Visitor details',
     ];
 
     $opts = array_merge($defaults, $opts);
@@ -77,16 +80,33 @@ function email_table(array $input, array $opts = []): string
         return '<pre style="margin:0; white-space:pre-wrap; word-break:break-word;">' . $escape($json) . '</pre>';
     };
 
+    $row = static function ($key, $value) use ($opts, $escape, $normalizeKey, $formatValue): string {
+        return '<tr>' .
+            '<th style="text-align:left;vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';background:' . $opts['header_bg'] . ';width:' . $opts['label_width'] . ';">' . $escape($normalizeKey($key)) . '</th>' .
+            '<td style="vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';width:' . $opts['value_width'] . ';">' . $formatValue($value) . '</td>' .
+            '</tr>';
+    };
+
+    $metaKey = (string) $opts['meta_key'];
+    $meta = $metaKey !== '' && is_array($input[$metaKey] ?? null) ? $input[$metaKey] : null;
+    if ($meta !== null) {
+        unset($input[$metaKey]);
+    }
+
     $rows = '';
 
     foreach ($input as $key => $value) {
-        $label = $normalizeKey($key);
-        $display = $formatValue($value);
+        $rows .= $row($key, $value);
+    }
 
+    if (! empty($meta)) {
         $rows .= '<tr>' .
-            '<th style="text-align:left;vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';background:' . $opts['header_bg'] . ';width:' . $opts['label_width'] . ';">' . $escape($label) . '</th>' .
-            '<td style="vertical-align:top;padding:10px;border:1px solid ' . $opts['border_color'] . ';width:' . $opts['value_width'] . ';">' . $display . '</td>' .
+            '<th colspan="2" style="text-align:left;padding:16px 10px 8px;border:none;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#6b7280;">' . $escape($opts['meta_heading']) . '</th>' .
             '</tr>';
+
+        foreach ($meta as $key => $value) {
+            $rows .= $row($key, $value);
+        }
     }
 
     $table = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:' . $opts['table_width'] . ';font-family:' . $opts['font_family'] . ';font-size:14px;line-height:1.5;color:#111827;">'

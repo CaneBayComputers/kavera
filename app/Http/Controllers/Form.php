@@ -27,6 +27,7 @@ class Form extends Controller
         }
 
         $form_data = $this->validateInput($request, $form['rules']);
+        unset($form_data[self::VISITOR_KEY]); // reserved for the visitor metadata below
         $user_fields = $form_data; // preserve raw user fields for webhook
 
 
@@ -265,22 +266,35 @@ class Form extends Controller
         return null;
     }
 
+    /**
+     * Key the visitor metadata is nested under in the form data. Kept apart
+     * from the submitted fields so a field named device, ip, browser and so
+     * on is never overwritten; email_table() renders it after the fields.
+     */
+    public const VISITOR_KEY = '_visitor';
+
     private function enrichClientMeta(array $data, Agent $agent, string $ip_address): array
     {
-        $data['timestamp']   = now()->setTimezone('UTC')->toRfc7231String();
-        $data['device']      = $agent->device();
-        $data['device_type'] = ucwords((string) $agent->deviceType());
-        $data['platform']    = $agent->platform();
-        $data['browser']     = $agent->browser();
-        $languages           = $agent->languages() ?? [];
-        $data['languages']   = implode(', ', $languages);
+        $languages = $agent->languages() ?? [];
+
+        $visitor = [
+            'timestamp'   => now()->setTimezone('UTC')->toRfc7231String(),
+            'device'      => $agent->device(),
+            'device_type' => ucwords((string) $agent->deviceType()),
+            'platform'    => $agent->platform(),
+            'browser'     => $agent->browser(),
+            'languages'   => implode(', ', $languages),
+        ];
 
         try {
             // IpApi::lookup() returns an array per library docs
-            $data['ip'] = IpApi::default($ip_address)->lookup();
+            $visitor['ip'] = IpApi::default($ip_address)->lookup();
         } catch (Exception $e) {
-            $data['ip'] = $ip_address;
+            $visitor['ip'] = $ip_address;
         }
+
+        // Appended, so it comes after the submitted fields (process() strips any submitted copy).
+        $data[self::VISITOR_KEY] = $visitor;
 
         return $data;
     }

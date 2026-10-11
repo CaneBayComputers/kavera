@@ -294,6 +294,7 @@ Google reCAPTCHA, and message content filters from logic found in
 * An unlimited number of forms can exist with each one outlined in the form config.
 * POST new HTML forms to `/forms/{form-name}` so they route through `Form::process`.
 * Keep response emails simple - Blade templates in `resources/views/emails` just receive `$formData`.
+* `$formData` holds the submitted fields plus one reserved key, `_visitor` (`Form::VISITOR_KEY`), with the visitor metadata: `timestamp`, `device`, `device_type`, `platform`, `browser`, `languages`, `ip` (an IP lookup array, or the bare IP). Form fields can use any of those names without being overwritten; a field named `_visitor` is dropped. Read metadata as `$formData['_visitor']['device']`. Webhooks get the submitted fields only.
 * Update `.env` mail targets (`CONTACT_FORM_MAIL_TO`, `CONTACT_FORM_SUCCESS_PAGE`) for destination changes.
 * reCAPTCHA is optional: without `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` the form still works in production and the check is skipped (with a warning in `laravel.log`). Set both keys to enable it.
 * **Every form uses the submit helper.** Add `data-kavera-form` to the `<form>`, keep the hidden `<input name="recaptcha">`, and include the partial once per page:
@@ -307,7 +308,7 @@ Google reCAPTCHA, and message content filters from logic found in
   The partial loads Google's reCAPTCHA script when a site key is configured (never in local dev) and `public/js/kavera-form.js`, which disables the button and shows "Sending…", fetches a token with an 8 second limit, and submits either way. The server then answers with a visitor-friendly message when the token is missing or the score is low, so a blocked or hanging reCAPTCHA never leaves a dead Send button. Never wire `grecaptcha.execute` by hand in a page. Optional form attributes: `data-sending-label`, `data-recaptcha-timeout` (ms).
 
 Email template helper
-- Use `email_table($formData)` (from `app/helpers.php`) to render a clean, inline‑styled HTML table in email bodies.
+- Use `email_table($formData)` (from `app/helpers.php`) to render a clean, inline‑styled HTML table in email bodies: the submitted fields first, then the `_visitor` metadata under a "Visitor details" heading (options `meta_key`, `meta_heading`).
 - The contact email view at `resources/views/emails/contact.blade.php` is a complete HTML email scaffold that embeds this helper.
 
 
