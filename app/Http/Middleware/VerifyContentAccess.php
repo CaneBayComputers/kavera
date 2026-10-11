@@ -31,11 +31,13 @@ class VerifyContentAccess
             abort(404);
         }
 
-        // Allow dynamic blog routes to pass through (handled by BlogController)
+        // Allow dynamic blog routes to pass through (handled by BlogController).
+        // Without Blogger configured those routes are not registered, so blog
+        // paths go through the registry like any other page.
         $base = trim((string) config('services.blogger.content_base', 'blog'), '/');
         $labelSeg = trim((string) config('services.blogger.label_segment', 'labels'), '/');
         if (
-            $base !== '' && (
+            $base !== '' && blogger_enabled() && (
             $path === $base ||
             preg_match('#^' . preg_quote($base, '#') . '/' . preg_quote($labelSeg, '#') . '/[^/]+$#', $path) ||
             preg_match('#^' . preg_quote($base, '#') . '/\d{4}/\d{2}$#', $path)

@@ -400,7 +400,7 @@ Configuration (`config/services.php` → `services.blogger`)
 - `post_section` (env `BLOGGER_POST_SECTION`, default `blog_content`) – section name posts render into
 - `label_segment` (env `BLOGGER_LABEL_SEGMENT`, default `labels`) – URL segment for label listings
 
-Routing (added in `routes/web.php`)
+Routing (added in `routes/web.php`, only when `blogger_enabled()`; without `BLOGGER_API_KEY` and `BLOGGER_BLOG_ID` these paths 404 like any unknown page)
 - `/<base>` → recent posts (from the cached index)
 - `/<base>/<label_segment>/<label>` → posts with label (newest first)
 - `/<base>/<YYYY>/<MM>` → monthly archive

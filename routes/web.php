@@ -12,11 +12,13 @@ Route::get('/', function () {
 
 Route::post('forms/{form}', [Form::class, 'process']);
 
-// Blogger routes (label and archive), configurable base and label segment
+// Blogger routes (label and archive), configurable base and label segment.
+// Only when Blogger is configured: otherwise blog paths fall through to the
+// content registry and 404 like any unknown page.
 Route::group([], function () {
     $base = trim((string) config('services.blogger.content_base', 'blog'), '/');
     $labelSeg = trim((string) config('services.blogger.label_segment', 'labels'), '/');
-    if ($base !== '') {
+    if ($base !== '' && blogger_enabled()) {
         Route::get("/{$base}", [BlogController::class, 'index'])->name('blog.index');
         Route::get("/{$base}/{$labelSeg}/{label}", [BlogController::class, 'byLabel'])->name('blog.label');
         Route::get("/{$base}/{year}/{month}", [BlogController::class, 'byArchive'])
