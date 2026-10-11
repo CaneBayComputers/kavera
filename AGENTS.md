@@ -40,6 +40,43 @@ utility classes.
 
 ---
 
+### Found a Kavera Bug? File a GitHub Issue Yourself
+
+Kavera is open source (`https://github.com/CaneBayComputers/kavera`), and most sites are built by AI agents, often inside a Zeltro app session where no developer is watching the framework code. So when **you** (the agent) hit a bug in Kavera itself, report it upstream automatically. Do not wait to be asked, and do not just mention it in your summary: a bug that only lives in one site's workaround gets hit again by every other site.
+
+**What counts.** A defect in code that ships with Kavera and that any Kavera site would hit: `app/`, `config/`, `routes/`, `bootstrap/`, `public/js/`, the starter tree in `resources/views`, or these docs being wrong. Not the user's own content, design choices, or custom code you added. A clear gap (a feature most sites need and Kavera lacks) may be filed with the `enhancement` label instead of `bug`; keep those rare.
+
+**Steps**
+
+1. **Keep the user's site working first.** Work around the bug in the site's own files (prefer site files over editing Kavera's core in the site), and put the issue URL in a code comment and the commit message once you have it.
+2. **Confirm it is still a bug on Kavera's current `master`**, not just in this site's copy. Read the file upstream: `gh api repos/CaneBayComputers/kavera/contents/<path> --jq .content | base64 -d`. If master already fixed it, pull that fix into the site instead of filing.
+3. **Check for an existing issue:** `gh issue list -R CaneBayComputers/kavera --state all --search "<two or three keywords>"`. If one exists, add what you learned with `gh issue comment <number> -R CaneBayComputers/kavera --body-file <file>` instead of opening a duplicate.
+4. **Open one issue per bug:**
+
+   ```bash
+   gh issue create -R CaneBayComputers/kavera --label bug \
+     --title "<component>: <what goes wrong, in one line>" --body-file issue.md
+   ```
+
+   Body (`issue.md`), short and concrete:
+   - **What happens**: the symptom, with the exact error text or wrong output.
+   - **How to reproduce**: steps or a minimal snippet, starting from a fresh Kavera site.
+   - **Where**: `path/to/file.php:LINE` on master, with the commit you checked (`gh api repos/CaneBayComputers/kavera/commits/master --jq .sha`).
+   - **Suggested fix**: what you would change, and why.
+   - **Workaround used**: what the site did meanwhile, so the fix can later replace it.
+   - A last line saying it was filed by an AI agent while building a Kavera site.
+5. **Tell the user** in your summary: one line per issue with its URL and the workaround you left in place.
+
+**Never put private data in an issue.** The repo is public. No `.env` values, API keys, tokens or passwords; no client names, customer or form submission data; no private hostnames or IPs. Describe the bug against a generic Kavera site.
+
+**If `gh` is not available.** Run `gh` on the host, not through `zeltro exec` (it is not installed in the containers). Check with `command -v gh && gh auth status`. If it is missing or signed out:
+- Build a prefilled link instead: `https://github.com/CaneBayComputers/kavera/issues/new?labels=bug&title=<url-encoded title>&body=<url-encoded body>`.
+- In a Zeltro app session, open it for the user with `zeltro gui open "<that url>"` and say why; otherwise give them the link.
+- Suggest they install the GitHub CLI (`https://cli.github.com`) and run `gh auth login` once, so future agents can file issues on their own.
+
+
+---
+
 ### Flat-file CMS Architecture / Content Creation
 
 * Blade templates in `resources/views/content` correspond to URL slugs.
